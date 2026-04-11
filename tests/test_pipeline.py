@@ -3,10 +3,11 @@ import uuid
 import pytest
 
 from app.pipeline.interface import (
-    AvailabilityStatus,
+    AwarenessInput,
     InputImageInfo,
     ModuleInfo,
     RunInput,
+    SubsetInfo,
 )
 from app.pipeline.modules.echo import EchoModule
 from app.pipeline.registry import ModuleRegistry
@@ -26,18 +27,38 @@ def test_echo_module_info():
 @pytest.mark.asyncio
 async def test_echo_check_availability_no_subsets():
     mod = EchoModule()
-    result = await mod.check_availability({})
-    assert result.status == AvailabilityStatus.unavailable
+    awareness_input = AwarenessInput(
+        sample_set_id=uuid.uuid4(),
+        sample_set_name="empty",
+        subsets=[],
+    )
+    result = await mod.check_availability(awareness_input)
+    assert result.available_subset_ids == []
+    assert result.recommended_subset_ids == []
+    assert result.reason == "No subsets available"
 
 
 @pytest.mark.asyncio
 async def test_echo_check_availability_with_subsets():
     mod = EchoModule()
-    result = await mod.check_availability(
-        {"subset_ids": ["00000000-0000-0000-0000-000000000001"]}
+    subset_id = uuid.uuid4()
+    awareness_input = AwarenessInput(
+        sample_set_id=uuid.uuid4(),
+        sample_set_name="test",
+        subsets=[
+            SubsetInfo(
+                id=subset_id,
+                name="raw",
+                type="raw",
+                metadata={},
+                images=[],
+            )
+        ],
     )
-    assert result.status == AvailabilityStatus.available
-    assert len(result.target_subset_ids) == 1
+    result = await mod.check_availability(awareness_input)
+    assert len(result.available_subset_ids) == 1
+    assert result.available_subset_ids[0] == subset_id
+    assert result.recommended_subset_ids == []
 
 
 @pytest.mark.asyncio
@@ -144,7 +165,7 @@ import uuid
 from typing import Any
 from app.pipeline.interface import (
     AvailabilityResult,
-    AvailabilityStatus,
+    AwarenessInput,
     ModuleInfo,
     PipelineModule,
     RunInput,
@@ -158,8 +179,8 @@ class TestModule(PipelineModule):
             version="1.0.0",
             description="test",
         )
-    async def check_availability(self, m):
-        return AvailabilityResult(status=AvailabilityStatus.unavailable)
+    async def check_availability(self, awareness_input):
+        return AvailabilityResult()
     async def load(self):
         pass
     async def unload(self):

@@ -7,11 +7,10 @@ Demonstrates the filesystem sandbox protocol:
 """
 
 import shutil
-from typing import Any
 
 from app.pipeline.interface import (
     AvailabilityResult,
-    AvailabilityStatus,
+    AwarenessInput,
     ModuleInfo,
     OutputImageInfo,
     PipelineModule,
@@ -41,17 +40,13 @@ class EchoModule(PipelineModule):
         )
 
     async def check_availability(
-        self, sample_set_meta: dict[str, Any]
+        self, awareness_input: AwarenessInput
     ) -> AvailabilityResult:
-        subset_ids = sample_set_meta.get("subset_ids", [])
-        if not subset_ids:
-            return AvailabilityResult(
-                status=AvailabilityStatus.unavailable,
-                reason="No subsets available",
-            )
+        if not awareness_input.subsets:
+            return AvailabilityResult(reason="No subsets available")
+        # Echo considers all subsets available (never specifically recommended)
         return AvailabilityResult(
-            status=AvailabilityStatus.available,
-            target_subset_ids=subset_ids,
+            available_subset_ids=[s.id for s in awareness_input.subsets],
         )
 
     async def load(self) -> None:

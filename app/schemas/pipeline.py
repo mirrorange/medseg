@@ -2,8 +2,6 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from app.pipeline.interface import AvailabilityStatus
-
 
 class ModuleInfoRead(BaseModel):
     name: str
@@ -17,11 +15,17 @@ class ModuleInfoRead(BaseModel):
     loaded: bool
 
 
-class ModuleAvailabilityRead(BaseModel):
+class ModuleAwarenessItem(BaseModel):
     module_name: str
-    status: AvailabilityStatus
-    target_subset_ids: list[str]
+    available_subset_ids: list[str]
+    recommended_subset_ids: list[str]
     reason: str | None
+
+
+class AwarenessResponse(BaseModel):
+    primary: ModuleAwarenessItem | None
+    suggested: list[ModuleAwarenessItem]
+    available: list[ModuleAwarenessItem]
 
 
 class ResourceStatusRead(BaseModel):

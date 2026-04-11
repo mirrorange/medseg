@@ -4,18 +4,18 @@ from fastapi import APIRouter, Depends
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.dependencies import get_current_user, require_admin
-from app.core.exceptions import AppError, PermissionDenied
+from app.core.exceptions import AppError
 from app.db import get_session
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.pipeline.state import registry, resource_manager
 from app.schemas.pipeline import (
-    ModuleAvailabilityRead,
+    AwarenessResponse,
     ModuleInfoRead,
     ResourceStatusRead,
 )
 from app.schemas.task import TaskCreate, TaskRead
+from app.services.pipeline import check_awareness
 from app.services.sample_set import get_sample_set
-from app.services.subset import list_subsets
 from app.services.task import submit_task
 
 router = APIRouter(prefix="/pipelines", tags=["pipelines"])
@@ -142,58 +142,15 @@ async def get_resources(
 
 @router.get(
     "/awareness/{sample_set_id}",
-    response_model=list[ModuleAvailabilityRead],
+    response_model=AwarenessResponse,
 )
-async def check_awareness(
+async def get_awareness(
     sample_set_id: uuid.UUID,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    ss = await get_sample_set(session, sample_set_id)
-    if ss.owner_id != user.id and user.role != UserRole.admin:
-        raise PermissionDenied()
-
-    # Build sample set metadata for modules
-    subsets = await list_subsets(session, sample_set_id)
-    meta = {
-        "sample_set_id": str(sample_set_id),
-        "sample_set_name": ss.name,
-        "subset_ids": [str(s.id) for s in subsets],
-        "subsets": [
-            {
-                "id": str(s.id),
-                "name": s.name,
-                "type": s.type,
-                "metadata": s.metadata_,
-            }
-            for s in subsets
-        ],
-    }
-
-    results = []
-    for mod in registry.list_enabled():
-        info = mod.module_info()
-        avail = await mod.check_availability(meta)
-        results.append(
-            ModuleAvailabilityRead(
-                module_name=info.name,
-                status=avail.status,
-                target_subset_ids=[str(i) for i in avail.target_subset_ids],
-                reason=avail.reason,
-            )
-        )
-    # Sort by suggestion_priority
-    results.sort(
-        key=lambda r: next(
-            (
-                m.module_info().suggestion_priority
-                for m in registry.list_enabled()
-                if m.module_info().name == r.module_name
-            ),
-            999,
-        )
-    )
-    return results
+    result = await check_awareness(session, sample_set_id, user)
+    return result
 
 
 # --------------- Run (submit task) ---------------
@@ -207,6 +164,9 @@ async def run_pipeline(
 ):
     """Submit a processing task to the scheduler."""
     # Verify user owns the sample set
+    from app.core.exceptions import PermissionDenied
+    from app.models.user import UserRole
+
     ss = await get_sample_set(session, body.sample_set_id)
     if ss.owner_id != user.id and user.role != UserRole.admin:
         raise PermissionDenied()

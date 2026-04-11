@@ -9,17 +9,10 @@ Design: modules communicate with the host via a filesystem sandbox.
 
 import uuid
 from abc import ABC, abstractmethod
-from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel
-
-
-class AvailabilityStatus(StrEnum):
-    unavailable = "unavailable"
-    available = "available"
-    recommended = "recommended"
 
 
 class ModuleInfo(BaseModel):
@@ -32,9 +25,41 @@ class ModuleInfo(BaseModel):
     params_schema: dict[str, Any] | None = None  # JSON Schema for params
 
 
+# --------------- Awareness I/O ---------------
+
+
+class SubsetImageSummary(BaseModel):
+    """Image-level metadata summary for awareness checks."""
+
+    id: uuid.UUID
+    filename: str
+    format: str  # "nifti" / "dicom"
+    metadata: dict[str, Any] = {}
+
+
+class SubsetInfo(BaseModel):
+    """Subset info with image-level detail, used as awareness input."""
+
+    id: uuid.UUID
+    name: str
+    type: str
+    metadata: dict[str, Any] = {}
+    images: list[SubsetImageSummary] = []
+
+
+class AwarenessInput(BaseModel):
+    """Structured input for check_availability — replaces raw dict."""
+
+    sample_set_id: uuid.UUID
+    sample_set_name: str
+    subsets: list[SubsetInfo] = []
+
+
 class AvailabilityResult(BaseModel):
-    status: AvailabilityStatus
-    target_subset_ids: list[uuid.UUID] = []
+    """Module's awareness response — separate available and recommended lists."""
+
+    available_subset_ids: list[uuid.UUID] = []
+    recommended_subset_ids: list[uuid.UUID] = []
     reason: str | None = None
 
 
@@ -92,9 +117,13 @@ class PipelineModule(ABC):
 
     @abstractmethod
     async def check_availability(
-        self, sample_set_meta: dict[str, Any]
+        self, awareness_input: AwarenessInput
     ) -> AvailabilityResult:
-        """Check whether this module is applicable to a sample set."""
+        """Check whether this module is applicable to a sample set.
+
+        Receives structured input with image-level metadata per subset.
+        Returns separate available and recommended subset ID lists.
+        """
 
     @abstractmethod
     async def load(self) -> None:

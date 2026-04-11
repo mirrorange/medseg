@@ -243,27 +243,54 @@ flowchart LR
 
 #### FR-5.1 可用性检测接口
 
-系统在用户打开样本集界面时，向所有已启用模块调用 `check_availability(sample_set_meta)`。
+系统在用户打开样本集界面时，向所有已启用模块调用 `check_availability(awareness_input)`。
 
-模块返回值：
+**输入**：系统为模块提供 **包含图像级元数据的子集信息**，使模块能够基于图像格式、数量等细粒度信息判断可用性：
 
+```python
+# 每个子集的图像摘要
+class SubsetImageSummary:
+    id: str
+    filename: str
+    format: str          # "nifti" / "dicom"
+    metadata: dict       # 图像级元数据（affine、slice count 等）
+
+# 每个子集的完整信息
+class SubsetInfo:
+    id: str
+    name: str
+    type: str
+    metadata: dict
+    images: list[SubsetImageSummary]
+
+# 感知输入
+class AwarenessInput:
+    sample_set_id: str
+    sample_set_name: str
+    subsets: list[SubsetInfo]
 ```
-{
-  status: "unavailable" | "available" | "recommended",
-  target_subset_ids: [...]   // 可运行 / 建议运行的子集 ID 列表
-  reason?: string            // 可选的说明文字
-}
+
+**模块返回值**：模块分别返回 **可用子集列表** 和 **建议子集列表**。不可用时两者均为空：
+
+```python
+class AvailabilityResult:
+    available_subset_ids: list[UUID]     # 可以运行但未特别推荐的子集
+    recommended_subset_ids: list[UUID]   # 建议运行的子集（通常是还没处理过的）
+    reason: str | None                   # 可选说明
 ```
+
+- 当 `available_subset_ids` 和 `recommended_subset_ids` 均为空时，表示模块对当前样本集 **不可用**
+- 同一个子集 ID 不应同时出现在两个列表中
 
 #### FR-5.2 判断规则示例
 
-| **模块** | **unavailable** | **available** | **recommended** |
+| **模块** | **不可用（两列表均空）** | **可用（仅 available）** | **建议（在 recommended 中）** |
 | --- | --- | --- | --- |
-| 标准化 | 无原始子集 | 存在原始子集且已有标准化子集 | 存在原始子集但无对应标准化子集 |
-| 分割 | 无所需标准化子集 | 存在标准化子集且已有分割结果 | 存在标准化子集但无分割结果，或新增了模态图像 |
+| 标准化 | 无原始子集 | 原始子集已有对应标准化子集 | 原始子集尚无对应标准化子集 |
+| 分割 | 无所需标准化子集 / 格式不兼容 | 标准化子集已有分割结果 | 标准化子集无分割结果，或新增了模态图像 |
 
-> 具体判断逻辑由模块自身实现，系统仅提供样本集元数据并收集返回值。
-> 
+> 具体判断逻辑由模块自身实现，系统提供包含图像级元数据的子集信息并收集返回值。
+> 模块可利用图像级元数据（如格式、分辨率）进行更精确的可用性判断。
 
 #### FR-5.3 建议优先级
 
@@ -271,11 +298,26 @@ flowchart LR
 - 例如：标准化 = 100，分割 = 200（值越小优先级越高）
 - 此优先级 **仅影响 UI 显示顺序**，不影响任务调度
 
-#### FR-5.4 UI 展示
+#### FR-5.4 三级响应格式
 
-- 样本集界面顶部显示 **建议操作卡片**（最高优先级的 `recommended` 模块）
+系统汇总所有模块的感知结果后，向客户端返回 **三级分层响应**：
+
+| **层级** | **说明** | **数量** |
+| --- | --- | --- |
+| **首选操作 (primary)** | 最高优先级的 recommended 模块（单个） | 0 或 1 |
+| **建议操作 (suggested)** | 其余含 recommended 子集的模块 | 0 ~ N |
+| **可用操作 (available)** | 仅含 available 子集、无 recommended 子集的模块 | 0 ~ N |
+
+- 所有模块按 `suggestion_priority` 排序
+- `primary` 从 recommended 模块中取优先级最高者
+- 两列表均空的模块不出现在响应中
+
+#### FR-5.5 UI 展示
+
+- 样本集界面顶部显示 **首选操作卡片**（primary，若存在）
 - 一键运行按钮 → 自动填充输入子集与输出名称 → 进入 FR-4 流程
-- 其他可用 / 建议模块折叠在"更多操作"菜单中
+- 建议操作展示为次级推荐列表
+- 可用操作折叠在"更多操作"菜单中
 - **注意**：管线感知在模块卸载时仍然运行（`check_availability` 不要求模型加载）
 
 ---

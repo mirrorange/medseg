@@ -371,7 +371,7 @@ async def require_owner(resource_owner_id: UUID, user: User = Depends(get_curren
 | GET | `/api/sample-sets/{id}` | 获取样本集详情（含子集列表） | 所有者/管理员 |
 | PUT | `/api/sample-sets/{id}` | 更新样本集（名称/描述/位置） | 所有者 |
 | DELETE | `/api/sample-sets/{id}` | 删除样本集（级联删除子集和图像） | 所有者 |
-| GET | `/api/sample-sets/{id}/awareness` | 获取管线感知建议 | 所有者/管理员 |
+| GET | `/api/sample-sets/{id}/awareness` | 获取管线感知建议（三级分层响应） | 所有者/管理员 |
 
 #### 子集 (`/api/sample-sets/{set_id}/subsets`)
 
@@ -457,9 +457,28 @@ class ModuleInfo(BaseModel):
     params_schema: dict | None        # 运行参数 JSON Schema（由 Pydantic 模型导出）
 
 class AvailabilityResult(BaseModel):
-    status: Literal["unavailable", "available", "recommended"]
-    target_subset_ids: list[UUID]
+    available_subset_ids: list[UUID]   # 可运行但未特别推荐的子集
+    recommended_subset_ids: list[UUID] # 建议运行的子集
     reason: str | None = None
+
+# ---- 感知输入（含图像级元数据） ----
+class SubsetImageSummary(BaseModel):
+    id: UUID
+    filename: str
+    format: str
+    metadata: dict
+
+class SubsetInfo(BaseModel):
+    id: UUID
+    name: str
+    type: str
+    metadata: dict
+    images: list[SubsetImageSummary]
+
+class AwarenessInput(BaseModel):
+    sample_set_id: UUID
+    sample_set_name: str
+    subsets: list[SubsetInfo]
 
 # ---- 运行输入/输出（文件系统沙箱协议） ----
 class InputImageInfo(BaseModel):
@@ -493,7 +512,7 @@ class PipelineModule(ABC):
     def module_info(self) -> ModuleInfo: ...
 
     @abstractmethod
-    async def check_availability(self, sample_set_meta: dict) -> AvailabilityResult: ...
+    async def check_availability(self, awareness_input: AwarenessInput) -> AvailabilityResult: ...
 
     @abstractmethod
     async def load(self) -> None: ...
@@ -524,7 +543,42 @@ class PipelineModule(ABC):
  ├─ 10. 清理临时目录                   │
 ```
 
-### 5.2 模块注册与发现
+### 5.2 管线感知服务
+
+管线感知逻辑封装在 **Service Layer**（`app/services/pipeline.py`），而非路由层：
+
+```python
+# app/services/pipeline.py — 职责
+
+async def check_awareness(session, sample_set_id, user) -> AwarenessResponse:
+    """
+    1. 查询样本集及其子集，加载图像级元数据
+    2. 构造 AwarenessInput（含 SubsetInfo + SubsetImageSummary）
+    3. 并发调用所有已启用模块的 check_availability()
+    4. 汇总结果构建三级分层响应：
+       - primary: 最高优先级的含 recommended 子集的模块（0 或 1）
+       - suggested: 其余含 recommended 子集的模块
+       - available: 仅含 available 子集的模块
+    5. 各层级内按 suggestion_priority 排序
+    """
+```
+
+#### 三级响应模型
+
+```python
+class ModuleAwarenessItem(BaseModel):
+    module_name: str
+    available_subset_ids: list[str]
+    recommended_subset_ids: list[str]
+    reason: str | None
+
+class AwarenessResponse(BaseModel):
+    primary: ModuleAwarenessItem | None    # 首选操作（单个）
+    suggested: list[ModuleAwarenessItem]   # 建议操作
+    available: list[ModuleAwarenessItem]   # 可用操作
+```
+
+### 5.3 模块注册与发现
 
 ```python
 # app/pipeline/registry.py — 职责
@@ -539,7 +593,7 @@ class ModuleRegistry:
 
 发现机制：基于 Python 的 `importlib` 动态导入，扫描 `modules/` 目录下的 `.py` 文件，查找 `PipelineModule` 子类。
 
-### 5.3 资源管理器
+### 5.4 资源管理器
 
 ```python
 # app/pipeline/resource_manager.py — 职责
