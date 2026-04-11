@@ -18,5 +18,12 @@
   },
   "image": {
     "notFound": "图像不存在。"
+  },
+  "library": {
+    "folderNotFound": "文件夹不存在。",
+    "folderNotEmpty": "文件夹不为空。请使用递归删除或先清空内容。",
+    "circularFolder": "不能将文件夹移动到其子文件夹中。",
+    "alreadyShared": "该样本集已被共享。",
+    "notShared": "该样本集未被共享。"
   }
 }

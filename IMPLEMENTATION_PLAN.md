@@ -54,7 +54,7 @@
 - 目录树嵌套展示
 - 样本集共享和撤回
 - 非所有者复制共享样本集
-**Status**: Not Started
+**Status**: Complete
 
 ## Stage 5: 管线子系统
 **Goal**: 实现 Pipeline Module Interface、Registry、ResourceManager
