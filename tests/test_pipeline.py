@@ -1,9 +1,12 @@
+import uuid
+
 import pytest
 
 from app.pipeline.interface import (
     AvailabilityStatus,
+    InputImageInfo,
     ModuleInfo,
-    SubsetRunContext,
+    RunInput,
 )
 from app.pipeline.modules.echo import EchoModule
 from app.pipeline.registry import ModuleRegistry
@@ -48,19 +51,51 @@ async def test_echo_load_unload():
 
 
 @pytest.mark.asyncio
-async def test_echo_run():
-    import uuid
-
+async def test_echo_run_filesystem_sandbox(tmp_path):
+    """Test echo module using the filesystem sandbox protocol."""
     mod = EchoModule()
     await mod.load()
-    ctx = SubsetRunContext(
-        sample_set_id=uuid.uuid4(),
-        input_subset_id=uuid.uuid4(),
-        output_subset_name="echo_output",
+
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    work_dir = tmp_path / "work"
+    input_dir.mkdir()
+    output_dir.mkdir()
+    work_dir.mkdir()
+
+    # Stage a fake image file in input_dir
+    (input_dir / "brain.nii.gz").write_bytes(b"fake-nifti-data")
+    img_id = uuid.uuid4()
+
+    run_input = RunInput(
+        work_dir=work_dir,
+        input_dir=input_dir,
+        output_dir=output_dir,
+        images=[
+            InputImageInfo(
+                id=img_id,
+                filename="brain.nii.gz",
+                format="nifti",
+                metadata={"slice_count": 120},
+            )
+        ],
+        params={},
+        sample_set_meta={"name": "test_set"},
     )
-    result = await mod.run(ctx)
-    assert result.output_subset_id is not None
+
+    result = await mod.run(run_input)
+
+    # Verify output
+    assert result.type == "echo"
     assert result.metadata["source_module"] == "echo"
+    assert len(result.images) == 1
+    assert result.images[0].filename == "brain.nii.gz"
+    assert result.images[0].source_image_id == img_id
+
+    # Verify file was actually copied
+    out_file = output_dir / "brain.nii.gz"
+    assert out_file.exists()
+    assert out_file.read_bytes() == b"fake-nifti-data"
 
 
 # --------------- Registry ---------------
@@ -112,8 +147,8 @@ from app.pipeline.interface import (
     AvailabilityStatus,
     ModuleInfo,
     PipelineModule,
-    SubsetRunContext,
-    SubsetRunResult,
+    RunInput,
+    RunOutput,
 )
 
 class TestModule(PipelineModule):
@@ -129,8 +164,8 @@ class TestModule(PipelineModule):
         pass
     async def unload(self):
         pass
-    async def run(self, ctx):
-        return SubsetRunResult(output_subset_id=uuid.uuid4())
+    async def run(self, run_input):
+        return RunOutput(type="test", metadata={})
 """
     )
     # Discovery requires the module to be importable via app.pipeline.modules.X

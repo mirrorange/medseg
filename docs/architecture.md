@@ -432,11 +432,21 @@ async def require_owner(resource_owner_id: UUID, user: User = Depends(get_curren
 
 ### 5.1 模块接口协议
 
+#### 设计原则
+
+模块与宿主（Host）之间通过 **文件系统沙箱** 通信，实现完全解耦：
+
+- **输入**：宿主将输入子集的图像文件暂存到临时目录，构造 `RunInput` 描述输入内容
+- **输出**：模块将处理结果写入指定输出目录，返回 `RunOutput` 描述输出内容
+- **宿主职责**：暂存输入文件 → 调用模块 → 收集输出文件存入对象存储 → 创建 Subset/Image 数据库记录
+- **模块无需**：访问数据库、对象存储、或宿主内部任何 API
+
 所有处理模块必须实现 `PipelineModule` 抽象基类：
 
 ```python
 # app/pipeline/interface.py — 简化示意
 
+# ---- 模块元数据 ----
 class ModuleInfo(BaseModel):
     name: str                         # 全局唯一标识
     version: str
@@ -444,13 +454,40 @@ class ModuleInfo(BaseModel):
     suggestion_priority: int          # 建议优先级（越小越高）
     max_ram_mb: int                   # 声明所需最大内存
     max_vram_mb: int                  # 声明所需最大显存
-    params_schema: type[BaseModel] | None  # 运行参数 Pydantic Schema
+    params_schema: dict | None        # 运行参数 JSON Schema（由 Pydantic 模型导出）
 
 class AvailabilityResult(BaseModel):
     status: Literal["unavailable", "available", "recommended"]
     target_subset_ids: list[UUID]
     reason: str | None = None
 
+# ---- 运行输入/输出（文件系统沙箱协议） ----
+class InputImageInfo(BaseModel):
+    id: UUID
+    filename: str                     # 相对于 input_dir 的文件名
+    format: str                       # "nifti" / "dicom"
+    metadata: dict
+
+class OutputImageInfo(BaseModel):
+    filename: str                     # 相对于 output_dir 的文件名
+    format: str
+    metadata: dict
+    source_image_id: UUID | None      # 关联到输入图像（用于叠加显示）
+
+class RunInput(BaseModel):
+    work_dir: Path                    # 临时工作目录（可读写）
+    input_dir: Path                   # 输入图像目录（只读）
+    output_dir: Path                  # 输出图像目录（可写）
+    images: list[InputImageInfo]      # 输入图像元数据列表
+    params: dict                      # 用户指定的运行参数
+    sample_set_meta: dict             # 样本集上下文（名称、子集列表等）
+
+class RunOutput(BaseModel):
+    type: str                         # 输出子集类型
+    metadata: dict                    # 输出子集元数据
+    images: list[OutputImageInfo]     # 输出图像描述列表
+
+# ---- 模块抽象基类 ----
 class PipelineModule(ABC):
     @abstractmethod
     def module_info(self) -> ModuleInfo: ...
@@ -465,7 +502,26 @@ class PipelineModule(ABC):
     async def unload(self) -> None: ...
 
     @abstractmethod
-    async def run(self, input_subset: SubsetRunContext) -> SubsetRunResult: ...
+    async def run(self, input: RunInput) -> RunOutput: ...
+```
+
+#### 执行流程（宿主编排）
+
+```
+宿主                                模块
+ │                                    │
+ ├─ 1. 创建 work_dir / input_dir /    │
+ │     output_dir 临时目录             │
+ ├─ 2. 从对象存储下载图像到 input_dir   │
+ ├─ 3. 构造 RunInput ─────────────────>│
+ │                                    ├─ 4. 读取 input_dir 中的文件
+ │                                    ├─ 5. 处理（推理/预处理）
+ │                                    ├─ 6. 写结果到 output_dir
+ │                                    ├─ 7. 返回 RunOutput ──────>│
+ ├─ 8. 从 output_dir 读取文件          │
+ │     上传到对象存储                   │
+ ├─ 9. 创建 Subset + Image 记录        │
+ ├─ 10. 清理临时目录                   │
 ```
 
 ### 5.2 模块注册与发现

@@ -1,8 +1,16 @@
-"""Pipeline Module Interface — all processing modules must implement this ABC."""
+"""Pipeline Module Interface — all processing modules must implement this ABC.
+
+Design: modules communicate with the host via a filesystem sandbox.
+- Host stages input images to a temp input_dir
+- Module reads from input_dir, writes results to output_dir
+- Host collects output files, saves to storage, creates DB records
+- Module never accesses DB, storage, or any host internals directly
+"""
 
 import uuid
 from abc import ABC, abstractmethod
 from enum import StrEnum
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel
@@ -30,18 +38,49 @@ class AvailabilityResult(BaseModel):
     reason: str | None = None
 
 
-class SubsetRunContext(BaseModel):
-    sample_set_id: uuid.UUID
-    input_subset_id: uuid.UUID
-    output_subset_name: str
-    params: dict[str, Any] = {}
-    storage_root: str = ""
+# --------------- Run I/O (filesystem sandbox protocol) ---------------
 
 
-class SubsetRunResult(BaseModel):
-    output_subset_id: uuid.UUID
-    image_ids: list[uuid.UUID] = []
+class InputImageInfo(BaseModel):
+    """Describes one input image file staged in input_dir."""
+
+    id: uuid.UUID
+    filename: str  # Relative to input_dir
+    format: str  # "nifti" / "dicom"
     metadata: dict[str, Any] = {}
+
+
+class OutputImageInfo(BaseModel):
+    """Describes one output image file written to output_dir."""
+
+    filename: str  # Relative to output_dir
+    format: str
+    metadata: dict[str, Any] = {}
+    source_image_id: uuid.UUID | None = None  # Link back to input image
+
+
+class RunInput(BaseModel):
+    """Everything a module needs to execute — no host internals exposed."""
+
+    model_config = {"arbitrary_types_allowed": True}
+
+    work_dir: Path  # Temporary working directory (read/write)
+    input_dir: Path  # Contains staged input images (read-only to module)
+    output_dir: Path  # Module writes output images here
+    images: list[InputImageInfo]  # Metadata about input images
+    params: dict[str, Any] = {}  # User-specified run parameters
+    sample_set_meta: dict[str, Any] = {}  # Sample set context
+
+
+class RunOutput(BaseModel):
+    """Module's processing result — host saves files and creates DB records."""
+
+    type: str  # Output subset type (e.g. "segmentation", "normalized")
+    metadata: dict[str, Any] = {}  # Subset-level metadata
+    images: list[OutputImageInfo] = []  # Description of output images
+
+
+# --------------- Abstract base class ---------------
 
 
 class PipelineModule(ABC):
@@ -66,8 +105,15 @@ class PipelineModule(ABC):
         """Unload model/resources, free memory/GPU."""
 
     @abstractmethod
-    async def run(self, context: SubsetRunContext) -> SubsetRunResult:
-        """Execute processing, producing a new subset."""
+    async def run(self, run_input: RunInput) -> RunOutput:
+        """Execute processing on staged input files, write output files.
+
+        The module should:
+        1. Read images from run_input.input_dir
+        2. Process them (using run_input.params if needed)
+        3. Write output images to run_input.output_dir
+        4. Return a RunOutput describing what was produced
+        """
 
     @property
     def is_loaded(self) -> bool:

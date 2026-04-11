@@ -1,10 +1,12 @@
 from app.pipeline.interface import (
     AvailabilityResult,
     AvailabilityStatus,
+    InputImageInfo,
     ModuleInfo,
+    OutputImageInfo,
     PipelineModule,
-    SubsetRunContext,
-    SubsetRunResult,
+    RunInput,
+    RunOutput,
 )
 from app.pipeline.registry import ModuleRegistry
 from app.pipeline.resource_manager import ResourceManager
@@ -12,10 +14,12 @@ from app.pipeline.resource_manager import ResourceManager
 __all__ = [
     "AvailabilityResult",
     "AvailabilityStatus",
+    "InputImageInfo",
     "ModuleInfo",
     "ModuleRegistry",
+    "OutputImageInfo",
     "PipelineModule",
     "ResourceManager",
-    "SubsetRunContext",
-    "SubsetRunResult",
+    "RunInput",
+    "RunOutput",
 ]
