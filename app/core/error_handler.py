@@ -1,10 +1,11 @@
-from typing import Dict, Any
+from typing import Any
+
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from loguru import logger
 
-from app.services.i18n import i18n_service
 from app.core.exceptions import AppError
+from app.services.i18n import i18n_service
 
 
 class ErrorHandler:
@@ -20,8 +21,8 @@ class ErrorHandler:
 
     @staticmethod
     def format_error_response(
-        error_code: int, message: str, context: Dict[str, Any] = None
-    ) -> Dict[str, Any]:
+        error_code: int, message: str, context: dict[str, Any] = None
+    ) -> dict[str, Any]:
         """
         Format error response in standardized format.
 

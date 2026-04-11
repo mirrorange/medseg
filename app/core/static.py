@@ -26,5 +26,6 @@ def register_static_routes(app: FastAPI):
             raise HTTPException(status_code=404, detail="Frontend not built")
     else:
         logger.warning(
-            "Static files directory not found. Run 'pnpm build' in the front directory to build the frontend."
+            "Static files directory not found. "
+            "Run 'pnpm build' in the front directory to build the frontend."
         )

@@ -1,6 +1,7 @@
 import json
 import re
-from typing import Dict, Any, Optional
+from typing import Any
+
 from loguru import logger
 
 from app.core.config import settings
@@ -13,7 +14,7 @@ class I18nService:
     """
 
     def __init__(self):
-        self._translations: Dict[str, Dict[str, Any]] = {}
+        self._translations: dict[str, dict[str, Any]] = {}
         self._default_language = settings.default_language
         self._locales_dir = settings.locales_folder
         self._load_translations()
@@ -27,13 +28,13 @@ class I18nService:
         for file_path in self._locales_dir.glob("*.json"):
             language_code = file_path.stem
             try:
-                with open(file_path, "r", encoding="utf-8") as f:
+                with open(file_path, encoding="utf-8") as f:
                     self._translations[language_code] = json.load(f)
                 logger.info(f"Loaded translations for language: {language_code}")
             except Exception as e:
                 logger.error(f"Failed to load translations for {language_code}: {e}")
 
-    def _get_nested_value(self, data: Dict[str, Any], key: str) -> Optional[str]:
+    def _get_nested_value(self, data: dict[str, Any], key: str) -> str | None:
         """
         Get a nested value from a dictionary using dot notation.
         Example: 'global.internalServerError' -> data['global']['internalServerError']
@@ -49,7 +50,7 @@ class I18nService:
 
         return current if isinstance(current, str) else None
 
-    def _interpolate_message(self, message: str, context: Dict[str, Any]) -> str:
+    def _interpolate_message(self, message: str, context: dict[str, Any]) -> str:
         """
         Interpolate context variables into the message.
         Supports {variable_name} syntax.
@@ -68,13 +69,14 @@ class I18nService:
         self,
         message_key: str,
         language: str = None,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> str:
         """
         Get a translated message by key and language.
 
         Args:
-            message_key: The message key in dot notation (e.g., 'global.internalServerError')
+            message_key: The message key in dot notation
+                (e.g., 'global.internalServerError')
             language: The language code (defaults to default language)
             context: Context variables for message interpolation
 
@@ -104,7 +106,7 @@ class I18nService:
         )
         return message_key
 
-    def parse_accept_language(self, accept_language: Optional[str]) -> str:
+    def parse_accept_language(self, accept_language: str | None) -> str:
         """
         Parse Accept-Language header and return the best matching language.
 

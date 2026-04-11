@@ -217,3 +217,11 @@ __marimo__/
 
 # Agent instructions
 /AGENTS.md
+
+# Prompts
+/.prompts.md
+
+# Application data
+*.db
+storage/
+logs/
