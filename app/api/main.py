@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.api.routes.admin import router as admin_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.images import router as images_router
 from app.api.routes.library import router as library_router
@@ -18,3 +19,4 @@ api_router.include_router(images_router)
 api_router.include_router(library_router)
 api_router.include_router(pipelines_router)
 api_router.include_router(tasks_router)
+api_router.include_router(admin_router)
