@@ -10,6 +10,9 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.db import get_session
 from app.main import app
 
+# Import all models so tables are registered
+from app.models import *  # noqa: F401, F403
+
 TEST_DATABASE_URL = "sqlite+aiosqlite://"
 
 
@@ -20,7 +23,7 @@ def event_loop():
     loop.close()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 async def engine():
     engine = create_async_engine(TEST_DATABASE_URL, echo=False)
     async with engine.begin() as conn:
@@ -35,7 +38,6 @@ async def engine():
 async def session(engine) -> AsyncGenerator[AsyncSession]:
     async with AsyncSession(engine) as session:
         yield session
-        await session.rollback()
 
 
 @pytest.fixture

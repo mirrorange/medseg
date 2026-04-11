@@ -25,7 +25,7 @@
 - 错误密码登录失败
 - JWT 认证保护的端点可访问
 - 非管理员访问管理员端点返回 403
-**Status**: Not Started
+**Status**: Complete
 
 ## Stage 3: 样本管理
 **Goal**: 实现 SampleSet/Subset/Image 模型和 CRUD API、文件上传/下载

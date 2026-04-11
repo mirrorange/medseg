@@ -43,3 +43,49 @@ class InternalServerError(AppError):
             status_code=500,
             context=context,
         )
+
+
+class InvalidCredentials(AppError):
+    def __init__(self):
+        super().__init__(
+            error_code=400001,
+            message_key="auth.invalidCredentials",
+            status_code=401,
+        )
+
+
+class TokenExpired(AppError):
+    def __init__(self):
+        super().__init__(
+            error_code=400002,
+            message_key="auth.tokenExpired",
+            status_code=401,
+        )
+
+
+class PermissionDenied(AppError):
+    def __init__(self):
+        super().__init__(
+            error_code=400003,
+            message_key="auth.permissionDenied",
+            status_code=403,
+        )
+
+
+class UserAlreadyExists(AppError):
+    def __init__(self, context: dict[str, Any] | None = None):
+        super().__init__(
+            error_code=401001,
+            message_key="user.alreadyExists",
+            status_code=409,
+            context=context,
+        )
+
+
+class UserNotFound(AppError):
+    def __init__(self):
+        super().__init__(
+            error_code=401002,
+            message_key="user.notFound",
+            status_code=404,
+        )
