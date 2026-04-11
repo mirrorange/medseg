@@ -89,3 +89,30 @@ class UserNotFound(AppError):
             message_key="user.notFound",
             status_code=404,
         )
+
+
+class TaskNotFound(AppError):
+    def __init__(self):
+        super().__init__(
+            error_code=404004,
+            message_key="task.notFound",
+            status_code=404,
+        )
+
+
+class TaskNotCancellable(AppError):
+    def __init__(self):
+        super().__init__(
+            error_code=404005,
+            message_key="task.notCancellable",
+            status_code=409,
+        )
+
+
+class ModuleNotAvailable(AppError):
+    def __init__(self):
+        super().__init__(
+            error_code=404006,
+            message_key="task.moduleNotAvailable",
+            status_code=400,
+        )

@@ -13,8 +13,10 @@ from app.schemas.pipeline import (
     ModuleInfoRead,
     ResourceStatusRead,
 )
+from app.schemas.task import TaskCreate, TaskRead
 from app.services.sample_set import get_sample_set
 from app.services.subset import list_subsets
+from app.services.task import submit_task
 
 router = APIRouter(prefix="/pipelines", tags=["pipelines"])
 
@@ -192,3 +194,30 @@ async def check_awareness(
         )
     )
     return results
+
+
+# --------------- Run (submit task) ---------------
+
+
+@router.post("/run", response_model=TaskRead, status_code=201)
+async def run_pipeline(
+    body: TaskCreate,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Submit a processing task to the scheduler."""
+    # Verify user owns the sample set
+    ss = await get_sample_set(session, body.sample_set_id)
+    if ss.owner_id != user.id and user.role != UserRole.admin:
+        raise PermissionDenied()
+
+    task = await submit_task(
+        session,
+        user_id=user.id,
+        module_name=body.module_name,
+        sample_set_id=body.sample_set_id,
+        input_subset_id=body.input_subset_id,
+        output_subset_name=body.output_subset_name,
+        params=body.params,
+    )
+    return task

@@ -83,7 +83,7 @@
 - 亲和性奖励验证
 - 任务取消
 - 失败重试
-**Status**: Not Started
+**Status**: Complete
 
 ## Stage 7: WebSocket 实时通信
 **Goal**: 实现 ConnectionManager、任务状态实时推送

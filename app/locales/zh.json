@@ -28,5 +28,11 @@
   },
   "pipeline": {
     "moduleNotFound": "管线模块不存在。"
+  },
+  "task": {
+    "notFound": "任务不存在。",
+    "notCancellable": "只能取消排队中的任务。",
+    "moduleNotAvailable": "请求的模块不可用或已被禁用。",
+    "insufficientResources": "资源不足，无法运行此任务。"
   }
 }

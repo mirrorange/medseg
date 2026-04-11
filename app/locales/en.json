@@ -28,5 +28,11 @@
   },
   "pipeline": {
     "moduleNotFound": "Pipeline module not found."
+  },
+  "task": {
+    "notFound": "Task not found.",
+    "notCancellable": "Only queued tasks can be cancelled.",
+    "moduleNotAvailable": "The requested module is not available or is disabled.",
+    "insufficientResources": "Insufficient resources to run this task."
   }
 }

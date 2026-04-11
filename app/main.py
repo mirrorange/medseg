@@ -9,7 +9,7 @@ from app.core.config import settings
 from app.core.error_handler import app_exception_handler
 from app.core.exceptions import AppError
 from app.core.static import register_static_routes
-from app.pipeline.state import registry, resource_manager
+from app.pipeline.state import registry, resource_manager, scheduler
 from app.utils.logger import configure_logger
 
 
@@ -23,7 +23,16 @@ async def lifespan(app: FastAPI):
     count = registry.discover(settings.modules_dir)
     logger.info("Discovered %d pipeline module(s)", count)
 
+    # Start task scheduler
+    from app.pipeline.scheduler import execute_task
+
+    scheduler.set_executor(execute_task)
+    scheduler.start()
+
     yield
+
+    # Stop scheduler
+    await scheduler.stop()
 
     # Unload all loaded modules on shutdown
     for name in list(resource_manager.loaded_module_names):
