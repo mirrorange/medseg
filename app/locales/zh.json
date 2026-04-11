@@ -10,5 +10,13 @@
   "user": {
     "alreadyExists": "用户已存在。",
     "notFound": "用户不存在。"
+  },
+  "sample": {
+    "setNotFound": "样本集不存在。",
+    "subsetNameConflict": "已存在同名子集。",
+    "subsetNotFound": "子集不存在。"
+  },
+  "image": {
+    "notFound": "图像不存在。"
   }
 }

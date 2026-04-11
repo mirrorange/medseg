@@ -41,7 +41,7 @@
 - Image 上传/下载/删除
 - 权限检查（所有者/管理员）
 - 级联删除正确
-**Status**: Not Started
+**Status**: Complete
 
 ## Stage 4: 样本库
 **Goal**: 实现 Folder 模型、目录树 API、共享机制

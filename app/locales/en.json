@@ -10,5 +10,13 @@
   "user": {
     "alreadyExists": "User already exists.",
     "notFound": "User not found."
+  },
+  "sample": {
+    "setNotFound": "Sample set not found.",
+    "subsetNameConflict": "A subset with this name already exists.",
+    "subsetNotFound": "Subset not found."
+  },
+  "image": {
+    "notFound": "Image not found."
   }
 }
