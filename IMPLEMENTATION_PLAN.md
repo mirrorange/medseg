@@ -68,7 +68,7 @@
 - 模块启用/禁用
 - 资源阈值检查
 - 淘汰策略正确性
-**Status**: Not Started
+**Status**: Complete
 
 ## Stage 6: 任务调度
 **Goal**: 实现 Scheduler、Task 模型、任务 API

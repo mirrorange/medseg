@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.core.error_handler import app_exception_handler
 from app.core.exceptions import AppError
 from app.core.static import register_static_routes
+from app.pipeline.state import registry, resource_manager
 from app.utils.logger import configure_logger
 
 
@@ -18,7 +19,15 @@ async def lifespan(app: FastAPI):
     configure_logger()
     logger.info("Starting MedSeg...")
 
+    # Discover pipeline modules
+    count = registry.discover(settings.modules_dir)
+    logger.info("Discovered %d pipeline module(s)", count)
+
     yield
+
+    # Unload all loaded modules on shutdown
+    for name in list(resource_manager.loaded_module_names):
+        await resource_manager.unload_module(name)
 
     logger.info("Shutting down MedSeg...")
 

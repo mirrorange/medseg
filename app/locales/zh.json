@@ -25,5 +25,8 @@
     "circularFolder": "不能将文件夹移动到其子文件夹中。",
     "alreadyShared": "该样本集已被共享。",
     "notShared": "该样本集未被共享。"
+  },
+  "pipeline": {
+    "moduleNotFound": "管线模块不存在。"
   }
 }
