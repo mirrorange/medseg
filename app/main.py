@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 from app.api.main import api_router
+from app.api.routes.ws import router as ws_router
 from app.core.config import settings
 from app.core.error_handler import app_exception_handler
 from app.core.exceptions import AppError
@@ -58,6 +59,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(api_router)
+app.include_router(ws_router)
 
 # Static files
 register_static_routes(app)

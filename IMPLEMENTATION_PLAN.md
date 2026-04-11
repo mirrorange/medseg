@@ -96,7 +96,7 @@
 - WebSocket 连接和认证
 - 任务状态推送
 - 连接断开清理
-**Status**: Not Started
+**Status**: Complete
 
 ## Stage 8: 管理后台 API
 **Goal**: 实现用户管理、模块管理、全局样本库管理 API

@@ -242,6 +242,29 @@ class Scheduler:
             self._schedule_event.set()
 
 
+async def _notify_task_status(
+    user_id: uuid.UUID,
+    task_id: uuid.UUID,
+    status: str,
+) -> None:
+    """Push task status update via WebSocket (best-effort)."""
+    try:
+        from app.api.routes.ws import manager
+
+        await manager.send_to_user(
+            user_id,
+            {
+                "type": "task_status_update",
+                "data": {
+                    "task_id": str(task_id),
+                    "status": status,
+                },
+            },
+        )
+    except Exception:
+        logger.debug("WS notification failed for task %s", task_id)
+
+
 async def execute_task(
     task_id: uuid.UUID,
     entry: dict[str, Any],
@@ -299,6 +322,8 @@ async def execute_task(
             session.add(task)
             await session.commit()
 
+        await _notify_task_status(user_id, task_id, "loading")
+
         # --- Load module ---
         mod = registry.get(module_name)
         if mod is None:
@@ -316,6 +341,8 @@ async def execute_task(
             task.status = TaskStatus.running
             session.add(task)
             await session.commit()
+
+        await _notify_task_status(user_id, task_id, "running")
 
         # --- Stage input files ---
         work_dir = Path(tempfile.mkdtemp(prefix="medseg_task_"))
@@ -425,6 +452,7 @@ async def execute_task(
             await session.commit()
 
         logger.info("Task %s completed successfully", task_id)
+        await _notify_task_status(user_id, task_id, "completed")
 
     except Exception as exc:
         logger.exception("Task %s failed: %s", task_id, exc)
@@ -453,13 +481,19 @@ async def execute_task(
                     user_id=user_id,
                     params=params,
                 )
-                logger.info("Task %s re-enqueued (retry %d)", task_id, task.retry_count)
+                logger.info(
+                    "Task %s re-enqueued (retry %d)",
+                    task_id,
+                    task.retry_count,
+                )
+                await _notify_task_status(user_id, task_id, "queued")
             else:
                 task.status = TaskStatus.failed
                 task.error_message = str(exc)
                 task.completed_at = datetime.now(UTC)
                 session.add(task)
                 await session.commit()
+                await _notify_task_status(user_id, task_id, "failed")
 
     finally:
         # Cleanup temp directory
