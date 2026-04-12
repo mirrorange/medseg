@@ -4,7 +4,7 @@ import { getMeApiUsersMeGet } from "~/api";
 import { useAuthStore } from "~/stores/auth";
 import { SidebarProvider, SidebarTrigger } from "~/components/ui/sidebar";
 import { AppSidebar } from "~/components/app-sidebar";
-import { UserMenu } from "~/components/user-menu";
+import { ModeToggle } from "~/components/mode-toggle";
 import { Separator } from "~/components/ui/separator";
 import { useWebSocket } from "~/hooks/use-websocket";
 
@@ -36,7 +36,7 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
           <SidebarTrigger />
           <Separator orientation="vertical" className="h-5" />
           <div className="flex-1" />
-          <UserMenu />
+          <ModeToggle />
         </header>
         <main className="flex-1 overflow-auto p-4">
           <Outlet />

@@ -4,8 +4,10 @@ import {
   ListTodo,
   Shield,
   Activity,
+  LogOut,
+  ChevronsUpDown,
 } from "lucide-react";
-import { NavLink, useLocation } from "react-router";
+import { NavLink, useLocation, useNavigate } from "react-router";
 import {
   Sidebar,
   SidebarContent,
@@ -18,7 +20,16 @@ import {
   SidebarMenuItem,
   SidebarFooter,
 } from "~/components/ui/sidebar";
-import { ModeToggle } from "~/components/mode-toggle";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "~/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback } from "~/components/ui/avatar";
+import { useAuthStore } from "~/stores/auth";
 import type { UserRead } from "~/api/types.gen";
 
 const mainNav = [
@@ -35,6 +46,14 @@ const adminNav = [
 
 export function AppSidebar({ user }: { user: UserRead }) {
   const location = useLocation();
+  const logout = useAuthStore((s) => s.logout);
+  const navigate = useNavigate();
+  const initials = user.username.slice(0, 2).toUpperCase();
+
+  function handleLogout() {
+    logout();
+    navigate("/login");
+  }
 
   return (
     <Sidebar>
@@ -87,10 +106,38 @@ export function AppSidebar({ user }: { user: UserRead }) {
           </SidebarGroup>
         )}
       </SidebarContent>
-      <SidebarFooter className="border-t p-2">
-        <div className="flex items-center justify-end">
-          <ModeToggle />
-        </div>
+      <SidebarFooter className="border-t">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton className="h-auto py-2">
+                  <Avatar className="h-7 w-7">
+                    <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-1 flex-col text-left text-sm leading-tight">
+                    <span className="truncate font-medium">{user.username}</span>
+                    <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+                  </div>
+                  <ChevronsUpDown className="ml-auto h-4 w-4 text-muted-foreground" />
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="top" align="start" className="w-56">
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col gap-1">
+                    <p className="text-sm font-medium">{user.username}</p>
+                    <p className="text-xs text-muted-foreground">{user.email}</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
   );

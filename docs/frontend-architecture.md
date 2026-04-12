@@ -127,9 +127,8 @@ front/
 │   │   │   ├── badge.tsx
 │   │   │   ├── toast.tsx
 │   │   │   └── ...
-│   │   ├── app-sidebar.tsx             # 应用侧边栏（导航菜单）
-│   │   ├── mode-toggle.tsx             # 暗色模式切换
-│   │   ├── user-menu.tsx               # 用户头像下拉菜单
+│   │   ├── app-sidebar.tsx             # 应用侧边栏（导航菜单 + 底部用户菜单/退出）
+│   │   ├── mode-toggle.tsx             # 暗色模式单击切换（light ↔ dark）
 │   │   ├── confirm-dialog.tsx          # 通用确认对话框
 │   │   ├── empty-state.tsx             # 空状态占位
 │   │   ├── loading-spinner.tsx         # 加载指示器
@@ -679,7 +678,7 @@ function CornerstoneViewport({ viewportId, orientation, volumeId }: Props) {
 ```
 ┌────────────────────────────────────────────────────┐
 │ ┌──────────┐ ┌──────────────────────────────────┐  │
-│ │          │ │ Header (面包屑 + 用户菜单 + 主题) │  │
+│ │          │ │ Header (SidebarTrigger + 主题切换) │  │
 │ │ Sidebar  │ ├──────────────────────────────────┤  │
 │ │          │ │                                  │  │
 │ │ - 样本库  │ │         Page Content             │  │
@@ -687,9 +686,16 @@ function CornerstoneViewport({ viewportId, orientation, volumeId }: Props) {
 │ │ - 任务中心│ │                                  │  │
 │ │ - 管理后台│ │                                  │  │
 │ │          │ │                                  │  │
-│ └──────────┘ └──────────────────────────────────┘  │
+│ │──────────│ └──────────────────────────────────┘  │
+│ │用户头像   │                                       │
+│ │+ 退出登录 │                                       │
+│ └──────────┘                                       │
 └────────────────────────────────────────────────────┘
 ```
+
+- **Header** 仅包含 SidebarTrigger（折叠/展开侧边栏按钮）和主题切换按钮（单击切换 light/dark）
+- **Sidebar 底部** 显示当前用户头像、用户名、邮箱，点击展开下拉菜单可退出登录
+- **主题切换** 采用单击切换（light ↔ dark），不使用下拉菜单，简化交互
 
 Sidebar 使用 Shadcn UI 的 **Sidebar** 组件，支持折叠/展开，响应式适配。
 
