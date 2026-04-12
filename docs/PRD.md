@@ -341,27 +341,7 @@ class AvailabilityResult:
 
 ### FR-7 用户界面
 
-#### FR-7.1 整体布局
-
-```mermaid
-flowchart LR
-    subgraph Layout
-        direction LR
-        A["侧边栏<br>资源浏览器"] --> B["中央区域<br>预览 / 编辑"]
-    end
-```
-
-- **侧边栏（资源浏览器）**：
-    - 目录树展示个人样本库 / 共享样本库
-    - 样本集展开后显示子集列表（扁平一层）
-    - 支持拖拽移动、右键菜单
-- **中央区域（预览 / 编辑）**：
-    - Cornerstone3D 渲染 NIfTI / DICOM 图像
-    - 支持 MPR（多平面重建）三视图
-    - Cornerstone Tools 提供画笔、橡皮擦、阈值分割等手动标注工具
-    - 分割结果叠加原始图像显示
-
-#### FR-7.2 关键页面
+#### FR-7.1 关键页面
 
 | **页面** | **功能** |
 | --- | --- |
