@@ -3,7 +3,7 @@ import { useAuthStore } from "~/stores/auth";
 
 export function setupApiClient() {
   client.setConfig({
-    baseUrl: "/api",
+    baseUrl: "",
   });
 
   client.interceptors.request.use(async (request) => {
