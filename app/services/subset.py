@@ -42,10 +42,19 @@ async def create_raw_subset(
     sample_set_id: uuid.UUID,
     name: str,
 ) -> Subset:
+    return await create_subset(session, sample_set_id, name, "raw")
+
+
+async def create_subset(
+    session: AsyncSession,
+    sample_set_id: uuid.UUID,
+    name: str,
+    type: str = "raw",
+) -> Subset:
     subset = Subset(
         sample_set_id=sample_set_id,
         name=name,
-        type="raw",
+        type=type,
         metadata_={},
     )
     session.add(subset)

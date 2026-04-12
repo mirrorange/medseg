@@ -81,7 +81,7 @@ export default function SampleSetDetailPage({
     refresh();
   }
 
-  // Find the first "raw" subset for image upload
+  // Find the first "raw" subset for image upload (optional)
   const rawSubset = sampleSet.subsets?.find((s) => s.type === "raw");
 
   return (
@@ -130,14 +130,12 @@ export default function SampleSetDetailPage({
         </div>
       </div>
 
-      {/* Image upload (only if raw subset exists) */}
-      {rawSubset && (
-        <ImageUpload
-          sampleSetId={sampleSet.id}
-          subsetId={rawSubset.id}
-          onUploaded={refresh}
-        />
-      )}
+      {/* Image upload — always visible; auto-creates raw subset if needed */}
+      <ImageUpload
+        sampleSetId={sampleSet.id}
+        subsetId={rawSubset?.id}
+        onUploaded={refresh}
+      />
 
       {/* Pipeline Awareness */}
       <PipelineAwareness

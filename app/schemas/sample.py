@@ -51,6 +51,11 @@ class SubsetUpdate(BaseModel):
     name: str | None = None
 
 
+class SubsetCreate(BaseModel):
+    name: str
+    type: str = "raw"
+
+
 # --- Image ---
 
 

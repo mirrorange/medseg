@@ -1,11 +1,15 @@
 import { useState, useRef } from "react";
 import { Upload } from "lucide-react";
 import { Button } from "~/components/ui/button";
-import { uploadApiSampleSetsSampleSetIdSubsetsSubsetIdImagesPost } from "~/api";
+import {
+  uploadApiSampleSetsSampleSetIdSubsetsSubsetIdImagesPost,
+  createApiSampleSetsSampleSetIdSubsetsPost,
+} from "~/api";
 
 interface ImageUploadProps {
   sampleSetId: string;
-  subsetId: string;
+  /** If provided, uploads into this subset. Otherwise auto-creates a "raw" subset first. */
+  subsetId?: string;
   onUploaded: () => void;
 }
 
@@ -21,9 +25,26 @@ export function ImageUpload({ sampleSetId, subsetId, onUploaded }: ImageUploadPr
     setError(null);
     setUploading(true);
 
+    let targetSubsetId = subsetId;
+
+    // Auto-create raw subset if none provided
+    if (!targetSubsetId) {
+      const { data: newSubset, error: createErr } =
+        await createApiSampleSetsSampleSetIdSubsetsPost({
+          path: { sample_set_id: sampleSetId },
+          body: { name: "raw", type: "raw" },
+        });
+      if (createErr || !newSubset) {
+        setUploading(false);
+        setError("Failed to create raw subset");
+        return;
+      }
+      targetSubsetId = newSubset.id;
+    }
+
     const { error: apiError } =
       await uploadApiSampleSetsSampleSetIdSubsetsSubsetIdImagesPost({
-        path: { sample_set_id: sampleSetId, subset_id: subsetId },
+        path: { sample_set_id: sampleSetId, subset_id: targetSubsetId },
         body: { file },
       });
 

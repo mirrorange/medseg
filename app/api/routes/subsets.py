@@ -7,10 +7,11 @@ from app.api.dependencies import get_current_user
 from app.core.exceptions import PermissionDenied
 from app.db import get_session
 from app.models.user import User, UserRole
-from app.schemas.sample import ImageRead, SubsetDetail, SubsetRead, SubsetUpdate
+from app.schemas.sample import ImageRead, SubsetCreate, SubsetDetail, SubsetRead, SubsetUpdate
 from app.services.image import list_images
 from app.services.sample_set import get_sample_set
 from app.services.subset import (
+    create_subset,
     delete_subset,
     get_subset,
     list_subsets,
@@ -48,6 +49,19 @@ async def list_all(
     if user.role != UserRole.admin and ss.owner_id != user.id:
         raise PermissionDenied()
     return await list_subsets(session, sample_set_id)
+
+
+@router.post("", response_model=SubsetRead, status_code=201)
+async def create(
+    sample_set_id: uuid.UUID,
+    body: SubsetCreate,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    ss = await get_sample_set(session, sample_set_id)
+    if user.role != UserRole.admin and ss.owner_id != user.id:
+        raise PermissionDenied()
+    return await create_subset(session, sample_set_id, body.name, body.type)
 
 
 @router.get("/{subset_id}", response_model=SubsetDetail)
