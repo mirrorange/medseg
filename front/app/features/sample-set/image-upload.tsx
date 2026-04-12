@@ -25,11 +25,6 @@ export function ImageUpload({ sampleSetId, subsetId, onUploaded }: ImageUploadPr
       await uploadApiSampleSetsSampleSetIdSubsetsSubsetIdImagesPost({
         path: { sample_set_id: sampleSetId, subset_id: subsetId },
         body: { file },
-        bodySerializer: (body) => {
-          const fd = new FormData();
-          fd.append("file", body.file);
-          return fd;
-        },
       });
 
     setUploading(false);

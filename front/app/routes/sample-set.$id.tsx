@@ -11,8 +11,11 @@ import {
   publishSharedApiLibrarySharedSampleSetIdPost,
   unpublishSharedApiLibrarySharedSampleSetIdDelete,
 } from "~/api";
+import type { ModuleAwarenessItem } from "~/api/types.gen";
 import { SubsetList } from "~/features/sample-set/subset-list";
 import { ImageUpload } from "~/features/sample-set/image-upload";
+import { PipelineAwareness } from "~/features/sample-set/pipeline-awareness";
+import { RunPipelineDialog } from "~/features/sample-set/run-pipeline-dialog";
 import { ConfirmDialog } from "~/components/confirm-dialog";
 
 export function meta({ data }: Route.MetaArgs) {
@@ -42,6 +45,11 @@ export default function SampleSetDetailPage({
   const [deleteSubsetId, setDeleteSubsetId] = useState<string | null>(null);
   const [deleteSubsetName, setDeleteSubsetName] = useState("");
   const [deleteSubsetLoading, setDeleteSubsetLoading] = useState(false);
+
+  // Run pipeline
+  const [runPipelineOpen, setRunPipelineOpen] = useState(false);
+  const [selectedModule, setSelectedModule] =
+    useState<ModuleAwarenessItem | null>(null);
 
   const refresh = useCallback(() => {
     revalidator.revalidate();
@@ -131,6 +139,15 @@ export default function SampleSetDetailPage({
         />
       )}
 
+      {/* Pipeline Awareness */}
+      <PipelineAwareness
+        sampleSetId={sampleSet.id}
+        onRunModule={(item) => {
+          setSelectedModule(item);
+          setRunPipelineOpen(true);
+        }}
+      />
+
       {/* Subsets */}
       <div>
         <h2 className="mb-3 text-lg font-semibold">Subsets</h2>
@@ -159,6 +176,14 @@ export default function SampleSetDetailPage({
         onConfirm={confirmDeleteSubset}
         loading={deleteSubsetLoading}
         destructive
+      />
+      <RunPipelineDialog
+        open={runPipelineOpen}
+        onOpenChange={setRunPipelineOpen}
+        sampleSetId={sampleSet.id}
+        subsets={sampleSet.subsets ?? []}
+        preselectedModule={selectedModule}
+        onSubmitted={refresh}
       />
     </div>
   );

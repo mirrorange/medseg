@@ -1,19 +1,12 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-
-export interface User {
-  id: string;
-  username: string;
-  email: string;
-  role: "user" | "admin";
-  is_active: boolean;
-}
+import type { UserRead } from "~/api/types.gen";
 
 interface AuthState {
   token: string | null;
-  user: User | null;
-  setAuth: (token: string, user: User) => void;
-  setUser: (user: User) => void;
+  user: UserRead | null;
+  setAuth: (token: string, user: UserRead) => void;
+  setUser: (user: UserRead) => void;
   logout: () => void;
 }
 

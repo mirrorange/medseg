@@ -39,7 +39,7 @@
 - 任务列表显示状态和排队位置
 - WebSocket 实时更新任务状态
 **Tests**: 管线感知展示、任务提交与状态更新
-**Status**: Not Started
+**Status**: Complete
 
 ## Stage 5: 医学影像查看器
 **Goal**: Cornerstone3D MPR 三视图、NIfTI/DICOM 加载、分割叠加、标注工具
