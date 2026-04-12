@@ -15,6 +15,7 @@ import {
 import { CreateFolderDialog } from "./create-folder-dialog";
 import { CreateSampleSetDialog } from "./create-sample-set-dialog";
 import { RenameFolderDialog } from "./rename-folder-dialog";
+import { MoveDialog } from "./move-dialog";
 import {
   deleteApiLibraryFoldersFolderIdDelete,
   deleteApiSampleSetsSampleSetIdDelete,
@@ -56,6 +57,7 @@ export function LibraryBrowser() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<LibraryItem | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
 
   // Context menu
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -146,8 +148,9 @@ export function LibraryBrowser() {
           break;
 
         case "move":
-          // Will be implemented in Stage 5
-          toast.info("Move dialog coming soon");
+          if (selectedIds.length > 0) {
+            setMoveOpen(true);
+          }
           break;
 
         case "delete":
@@ -219,6 +222,23 @@ export function LibraryBrowser() {
     }
   }, [renameSS, refresh]);
 
+  // Handle drag-and-drop onto a folder
+  const handleDropOnFolder = useCallback(
+    async (targetFolderId: string, draggedIds: string[]) => {
+      const moveItems = items
+        .filter((i) => draggedIds.includes(i.id))
+        .map((i) => ({ id: i.id, type: i.type }));
+      if (moveItems.length === 0) return;
+      try {
+        await useLibraryStore.getState().batchMove(targetFolderId, moveItems);
+        toast.success(`Moved ${moveItems.length} item${moveItems.length > 1 ? "s" : ""}`);
+      } catch {
+        toast.error("Failed to move items");
+      }
+    },
+    [items],
+  );
+
   return (
     <div className="flex h-full flex-col">
       <LibraryToolbar
@@ -252,6 +272,7 @@ export function LibraryBrowser() {
                   selectedIds={selectedIds}
                   onOpen={handleOpen}
                   onContextMenu={handleContextMenu}
+                  onDropOnFolder={handleDropOnFolder}
                 />
               ) : (
                 <LibraryGridView
@@ -259,6 +280,7 @@ export function LibraryBrowser() {
                   selectedIds={selectedIds}
                   onOpen={handleOpen}
                   onContextMenu={handleContextMenu}
+                  onDropOnFolder={handleDropOnFolder}
                 />
               )}
             </div>
@@ -338,6 +360,24 @@ export function LibraryBrowser() {
         loading={deleteLoading}
         onConfirm={handleDelete}
         destructive
+      />
+
+      <MoveDialog
+        open={moveOpen}
+        onOpenChange={setMoveOpen}
+        itemNames={items.filter((i) => selectedIds.includes(i.id)).map((i) => i.name)}
+        onConfirm={async (targetFolderId) => {
+          const moveItems = items
+            .filter((i) => selectedIds.includes(i.id))
+            .map((i) => ({ id: i.id, type: i.type }));
+          try {
+            await useLibraryStore.getState().batchMove(targetFolderId, moveItems);
+            toast.success("Moved successfully");
+          } catch {
+            toast.error("Failed to move items");
+            throw new Error("move failed");
+          }
+        }}
       />
     </div>
   );

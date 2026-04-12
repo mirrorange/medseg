@@ -58,4 +58,4 @@
 - HTML5 drag-and-drop: drag items onto folders to move
 - All interactions tested end-to-end
 **Tests**: Manual E2E verification
-**Status**: Not Started
+**Status**: Complete

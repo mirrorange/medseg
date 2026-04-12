@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import {
   Table,
@@ -17,6 +18,7 @@ interface LibraryListViewProps {
   selectedIds: string[];
   onOpen: (item: LibraryItem) => void;
   onContextMenu: (e: React.MouseEvent, item: LibraryItem) => void;
+  onDropOnFolder?: (targetFolderId: string, draggedIds: string[]) => void;
 }
 
 function formatDate(iso: string): string {
@@ -34,9 +36,11 @@ export function LibraryListView({
   selectedIds,
   onOpen,
   onContextMenu,
+  onDropOnFolder,
 }: LibraryListViewProps) {
   const { sortField, sortDirection, setSortField, select, selectRange } =
     useLibraryStore();
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
   const handleClick = (e: React.MouseEvent, item: LibraryItem) => {
     if (e.shiftKey) {
@@ -45,6 +49,41 @@ export function LibraryListView({
       select(item.id, true);
     } else {
       select(item.id);
+    }
+  };
+
+  const handleDragStart = (e: React.DragEvent, item: LibraryItem) => {
+    // If dragged item is not in selection, select it first
+    const ids = selectedIds.includes(item.id) ? selectedIds : [item.id];
+    e.dataTransfer.setData("application/x-library-ids", JSON.stringify(ids));
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e: React.DragEvent, item: LibraryItem) => {
+    if (item.type !== "folder") return;
+    // Don't allow dropping on itself
+    if (selectedIds.includes(item.id)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDropTargetId(item.id);
+  };
+
+  const handleDragLeave = () => {
+    setDropTargetId(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, item: LibraryItem) => {
+    e.preventDefault();
+    setDropTargetId(null);
+    if (item.type !== "folder" || !onDropOnFolder) return;
+    const raw = e.dataTransfer.getData("application/x-library-ids");
+    if (!raw) return;
+    try {
+      const ids = JSON.parse(raw) as string[];
+      if (ids.includes(item.id)) return;
+      onDropOnFolder(item.id, ids);
+    } catch {
+      // ignore malformed data
     }
   };
 
@@ -95,17 +134,24 @@ export function LibraryListView({
         )}
         {items.map((item) => {
           const isSelected = selectedIds.includes(item.id);
+          const isDropTarget = dropTargetId === item.id;
           return (
             <TableRow
               key={item.id}
               data-selected={isSelected || undefined}
+              draggable
               className={cn(
                 "cursor-pointer select-none",
                 isSelected && "bg-accent",
+                isDropTarget && "ring-primary ring-2 ring-inset",
               )}
               onClick={(e) => handleClick(e, item)}
               onDoubleClick={() => onOpen(item)}
               onContextMenu={(e) => onContextMenu(e, item)}
+              onDragStart={(e) => handleDragStart(e, item)}
+              onDragOver={(e) => handleDragOver(e, item)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, item)}
             >
               <TableCell className="flex items-center gap-2">
                 <LibraryItemIcon item={item} />
