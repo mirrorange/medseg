@@ -29,7 +29,7 @@
 - 图像上传（multipart）和下载
 - 共享样本库浏览与复制
 **Tests**: 文件夹CRUD、样本集CRUD、图像上传下载
-**Status**: Not Started
+**Status**: Complete
 
 ## Stage 4: 管线与任务
 **Goal**: 管线感知建议、运行管线对话框（含动态参数表单）、任务中心、WebSocket 实时推送

@@ -10,6 +10,7 @@ export default [
   layout("routes/layout.tsx", [
     route("app/library", "routes/library.tsx"),
     route("app/shared", "routes/shared-library.tsx"),
+    route("app/sample-sets/:id", "routes/sample-set.$id.tsx"),
     route("app/tasks", "routes/tasks.tsx"),
   ]),
 ] satisfies RouteConfig;

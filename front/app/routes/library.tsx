@@ -1,16 +1,26 @@
+import { useRevalidator } from "react-router";
 import type { Route } from "./+types/library";
+import { treeApiLibraryTreeGet } from "~/api";
+import { FolderTree } from "~/features/library/folder-tree";
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: "Library - MedSeg Cloud" }];
 }
 
-export default function LibraryPage() {
+export async function clientLoader() {
+  const { data } = await treeApiLibraryTreeGet();
+  return { tree: data ?? { folders: [], root_sample_sets: [] } };
+}
+
+export default function LibraryPage({ loaderData }: Route.ComponentProps) {
+  const revalidator = useRevalidator();
+
   return (
-    <div>
-      <h1 className="text-2xl font-bold tracking-tight">Library</h1>
-      <p className="mt-2 text-muted-foreground">
-        Browse and manage your sample sets and folders.
-      </p>
+    <div className="flex h-full flex-col">
+      <FolderTree
+        tree={loaderData.tree}
+        onRefresh={() => revalidator.revalidate()}
+      />
     </div>
   );
 }
