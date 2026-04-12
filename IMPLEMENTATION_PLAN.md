@@ -32,7 +32,7 @@
 - `stores/library.ts` created with state management (navigation, selection, sorting, view mode)
 - Store can fetch contents and navigate between folders
 **Tests**: Manual verification via dev tools
-**Status**: Not Started
+**Status**: Complete
 
 ## Stage 4: Frontend — Browser UI Components
 **Goal**: Implement the file-manager-style Library Browser UI
@@ -46,7 +46,7 @@
 - `LibraryItemIcon` for folder/sample_set icons
 - Route updated to use LibraryBrowser
 **Tests**: Manual verification
-**Status**: Not Started
+**Status**: Complete
 
 ## Stage 5: Frontend — Dialogs & Drag-and-Drop
 **Goal**: Implement action dialogs and drag-and-drop moving

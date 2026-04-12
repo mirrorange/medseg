@@ -226,3 +226,4 @@ __marimo__/
 *.db
 storage/
 logs/
+.DS_Store
