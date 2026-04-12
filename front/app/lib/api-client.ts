@@ -20,8 +20,11 @@ export function setupApiClient() {
 
   client.interceptors.response.use(async (response) => {
     if (response.status === 401) {
-      useAuthStore.getState().logout();
-      window.location.href = "/login";
+      const { token, logout } = useAuthStore.getState();
+      if (token) {
+        logout();
+        window.location.href = "/login";
+      }
     }
     return response;
   });
