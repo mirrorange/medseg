@@ -177,7 +177,9 @@ async function loadImageAsVolume(
 
   const downloadUrl = `/api/sample-sets/${sampleSetId}/subsets/${subsetId}/images/${image.id}/download`;
 
-  if (image.format === "nifti") {
+  const format = image.format.toLowerCase();
+
+  if (format === "nifti") {
     // Download the file, create a blob URL, then use the NIfTI loader
     const response = await fetch(downloadUrl, {
       headers: { Authorization: `Bearer ${token}` },
@@ -198,7 +200,7 @@ async function loadImageAsVolume(
     return volumeId;
   }
 
-  if (image.format === "dicom") {
+  if (format === "dicom") {
     // For DICOM, we'd need multiple imageIds for a series
     // For now, load single file via wadouri
     const response = await fetch(downloadUrl, {
