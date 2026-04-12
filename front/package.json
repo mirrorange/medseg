@@ -10,6 +10,10 @@
     "api:generate": "openapi-ts"
   },
   "dependencies": {
+    "@cornerstonejs/core": "^4.21.2",
+    "@cornerstonejs/dicom-image-loader": "^4.21.2",
+    "@cornerstonejs/nifti-volume-loader": "^4.21.2",
+    "@cornerstonejs/tools": "^4.21.2",
     "@fontsource-variable/inter": "^5.2.8",
     "@react-router/node": "7.14.0",
     "@react-router/serve": "7.14.0",

@@ -49,7 +49,7 @@
 - 分割 mask 半透明叠加显示
 - 画笔、窗宽窗位、缩放等工具可用
 **Tests**: 图像渲染、工具交互、分割叠加
-**Status**: Not Started
+**Status**: Complete
 
 ## Stage 6: 管理后台
 **Goal**: 用户管理、模块管理、全局样本库管理、统计信息

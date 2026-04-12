@@ -12,5 +12,6 @@ export default [
     route("app/shared", "routes/shared-library.tsx"),
     route("app/sample-sets/:id", "routes/sample-set.$id.tsx"),
     route("app/tasks", "routes/tasks.tsx"),
+    route("app/viewer/:setId/:subsetId", "routes/viewer.$setId.$subsetId.tsx"),
   ]),
 ] satisfies RouteConfig;
