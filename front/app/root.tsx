@@ -9,7 +9,11 @@ import {
 
 import type { Route } from "./+types/root";
 import { ThemeProvider } from "~/providers/theme-provider";
+import { TooltipProvider } from "~/components/ui/tooltip";
+import { setupApiClient } from "~/lib/api-client";
 import "./app.css";
+
+setupApiClient();
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -22,7 +26,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         <ThemeProvider defaultTheme="system" storageKey="medseg-theme">
-          {children}
+          <TooltipProvider>
+            {children}
+          </TooltipProvider>
         </ThemeProvider>
         <ScrollRestoration />
         <Scripts />

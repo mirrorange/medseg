@@ -1,5 +1,7 @@
 import type { Route } from "./+types/home";
+import { redirect } from "react-router";
 import { ModeToggle } from "~/components/mode-toggle";
+import { useAuthStore } from "~/stores/auth";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -9,6 +11,14 @@ export function meta({}: Route.MetaArgs) {
       content: "Medical Image Cloud Processing & Annotation Platform",
     },
   ];
+}
+
+export async function clientLoader() {
+  const token = useAuthStore.getState().token;
+  if (token) {
+    throw redirect("/app/library");
+  }
+  return null;
 }
 
 export default function Home() {

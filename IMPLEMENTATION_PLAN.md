@@ -19,7 +19,7 @@
 - 已登录用户看到 Sidebar 布局
 - 管理员可见管理菜单
 **Tests**: 登录/注册流程、路由守卫、Sidebar 导航
-**Status**: Not Started
+**Status**: Complete
 
 ## Stage 3: 样本库与样本管理
 **Goal**: 目录树浏览、样本集 CRUD、子集列表、图像上传/下载
