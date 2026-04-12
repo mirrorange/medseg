@@ -4,7 +4,9 @@ import {
   Enums,
   setVolumesForViewports,
   getRenderingEngine,
+  VolumeViewport3D,
 } from "@cornerstonejs/core";
+import type { Types } from "@cornerstonejs/core";
 import { ToolGroupManager } from "@cornerstonejs/tools";
 import { RENDERING_ENGINE_ID, TOOL_GROUP_ID } from "./cornerstone-init";
 
@@ -18,38 +20,56 @@ const ORIENTATION_MAP: Record<Orientation, Enums.OrientationAxis> = {
   coronal: OrientationAxis.CORONAL,
 };
 
-interface CornerstoneViewportProps {
+interface CornerstoneViewportBaseProps {
   viewportId: string;
-  orientation: Orientation;
   volumeId: string | null;
   className?: string;
 }
 
-export function CornerstoneViewport({
-  viewportId,
-  orientation,
-  volumeId,
-  className,
-}: CornerstoneViewportProps) {
+interface OrthographicProps extends CornerstoneViewportBaseProps {
+  type?: "orthographic";
+  orientation: Orientation;
+  preset?: never;
+}
+
+interface Volume3DProps extends CornerstoneViewportBaseProps {
+  type: "volume3d";
+  orientation?: never;
+  preset?: string;
+}
+
+export type CornerstoneViewportProps = OrthographicProps | Volume3DProps;
+
+export function CornerstoneViewport(props: CornerstoneViewportProps) {
+  const { viewportId, volumeId, className } = props;
   const elementRef = useRef<HTMLDivElement>(null);
+  const is3D = props.type === "volume3d";
 
   useEffect(() => {
     if (!elementRef.current) return;
 
-    // Create or reuse rendering engine
     let renderingEngine = getRenderingEngine(RENDERING_ENGINE_ID);
     if (!renderingEngine) {
       renderingEngine = new RenderingEngine(RENDERING_ENGINE_ID);
     }
 
-    const viewportInput = {
-      viewportId,
-      element: elementRef.current,
-      type: ViewportType.ORTHOGRAPHIC,
-      defaultOptions: {
-        orientation: ORIENTATION_MAP[orientation],
-      },
-    };
+    const viewportInput: Types.PublicViewportInput = is3D
+      ? {
+          viewportId,
+          element: elementRef.current,
+          type: ViewportType.VOLUME_3D,
+          defaultOptions: {
+            background: [0.2, 0.2, 0.2] as Types.Point3,
+          },
+        }
+      : {
+          viewportId,
+          element: elementRef.current,
+          type: ViewportType.ORTHOGRAPHIC,
+          defaultOptions: {
+            orientation: ORIENTATION_MAP[props.orientation],
+          },
+        };
 
     renderingEngine.enableElement(viewportInput);
 
@@ -62,7 +82,7 @@ export function CornerstoneViewport({
       engine?.disableElement(viewportId);
       toolGroup?.removeViewports(RENDERING_ENGINE_ID, viewportId);
     };
-  }, [viewportId, orientation]);
+  }, [viewportId, is3D, props.type === "orthographic" ? props.orientation : undefined]);
 
   // When volumeId changes, set the volume
   useEffect(() => {
@@ -76,9 +96,14 @@ export function CornerstoneViewport({
       [{ volumeId }],
       [viewportId]
     ).then(() => {
+      if (is3D) {
+        const viewport = renderingEngine.getViewport(viewportId) as VolumeViewport3D;
+        const presetName = (props.type === "volume3d" && props.preset) || "CT-Bone";
+        viewport.setProperties({ preset: presetName });
+      }
       renderingEngine.render();
     });
-  }, [volumeId, viewportId]);
+  }, [volumeId, viewportId, is3D, props.type === "volume3d" ? props.preset : undefined]);
 
   return (
     <div
