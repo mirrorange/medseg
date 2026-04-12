@@ -24,7 +24,8 @@
     "folderNotEmpty": "Folder is not empty. Use recursive delete or remove contents first.",
     "circularFolder": "Cannot move folder into its own descendant.",
     "alreadyShared": "This sample set is already shared.",
-    "notShared": "This sample set is not shared."
+    "notShared": "This sample set is not shared.",
+    "duplicateName": "An item with this name already exists in the target folder."
   },
   "pipeline": {
     "moduleNotFound": "Pipeline module not found."

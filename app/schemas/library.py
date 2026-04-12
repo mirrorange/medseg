@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -39,6 +40,44 @@ class TreeSampleSet(BaseModel):
     description: str | None
     created_at: datetime
     updated_at: datetime
+
+
+# --- Library contents (flat view) ---
+
+
+class BreadcrumbItem(BaseModel):
+    id: uuid.UUID | None
+    name: str
+
+
+class LibraryItem(BaseModel):
+    """A unified item in folder contents (folder or sample_set)."""
+    id: uuid.UUID
+    name: str
+    type: Literal["folder", "sample_set"]
+    description: str | None = None
+    child_count: int | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class LibraryContents(BaseModel):
+    folder_id: uuid.UUID | None
+    breadcrumb: list[BreadcrumbItem]
+    items: list[LibraryItem]
+
+
+# --- Batch move ---
+
+
+class BatchMoveItem(BaseModel):
+    type: Literal["folder", "sample_set"]
+    id: uuid.UUID
+
+
+class BatchMoveRequest(BaseModel):
+    items: list[BatchMoveItem]
+    target_folder_id: uuid.UUID | None = None
 
 
 # --- Share ---

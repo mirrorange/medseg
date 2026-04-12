@@ -24,7 +24,8 @@
     "folderNotEmpty": "文件夹不为空。请使用递归删除或先清空内容。",
     "circularFolder": "不能将文件夹移动到其子文件夹中。",
     "alreadyShared": "该样本集已被共享。",
-    "notShared": "该样本集未被共享。"
+    "notShared": "该样本集未被共享。",
+    "duplicateName": "目标文件夹中已存在同名项目。"
   },
   "pipeline": {
     "moduleNotFound": "管线模块不存在。"

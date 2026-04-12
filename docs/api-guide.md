@@ -83,20 +83,80 @@ JWT 默认 24 小时过期。过期后需重新登录。
 
 ## 4 · 样本库 API (`/api/library`)
 
-样本库采用 **文件夹 + 样本集** 的目录树结构。
+样本库采用类文件系统的虚拟目录结构，文件夹和样本集作为两种类型的"项目"统一管理。
 
 | 方法 | 路径 | 说明 | 认证 |
 | --- | --- | --- | --- |
-| GET | `/api/library/tree` | 获取目录树（文件夹 + 根级样本集） | 用户 |
-| POST | `/api/library/folders` | 创建文件夹 | 用户 |
+| GET | `/api/library/contents` | 获取指定目录下的内容（扁平列表） | 用户 |
+| GET | `/api/library/tree` | 获取完整目录树（用于移动对话框等） | 用户 |
+| GET | `/api/library/path/{folder_id}` | 获取文件夹面包屑路径（祖先链） | 用户 |
+| POST | `/api/library/folders` | 创建文件夹（同目录名称唯一） | 用户 |
 | PUT | `/api/library/folders/{id}` | 重命名/移动文件夹 | 所有者 |
 | DELETE | `/api/library/folders/{id}` | 删除文件夹（`?recursive=true` 级联） | 所有者 |
+| POST | `/api/library/batch-move` | 批量移动文件夹/样本集到目标目录 | 所有者 |
 | GET | `/api/library/shared` | 浏览共享样本库 | 用户 |
 | POST | `/api/library/shared/{sample_set_id}` | 发布样本集到共享库 | 所有者 |
 | DELETE | `/api/library/shared/{sample_set_id}` | 撤回共享 | 所有者 |
 | POST | `/api/library/shared/{sample_set_id}/copy` | 复制共享样本集到个人库 | 用户 |
 
-### 目录树响应结构
+### 目录内容响应（`GET /api/library/contents`）
+
+**查询参数**：`folder_id`（UUID，可选，null 为根目录）、`sort_by`（`name`|`created_at`|`updated_at`）、`sort_order`（`asc`|`desc`）
+
+```json
+{
+  "folder_id": null,
+  "breadcrumb": [
+    { "id": null, "name": "Library" }
+  ],
+  "items": [
+    {
+      "id": "uuid",
+      "name": "CT Scans",
+      "type": "folder",
+      "created_at": "2026-04-12T...",
+      "updated_at": "2026-04-12T...",
+      "child_count": 5
+    },
+    {
+      "id": "uuid",
+      "name": "Patient-001",
+      "type": "sample_set",
+      "description": "Lung CT study",
+      "created_at": "2026-04-12T...",
+      "updated_at": "2026-04-12T..."
+    }
+  ]
+}
+```
+
+**排序规则**：文件夹始终排在样本集前面，同类型内按指定字段排序。
+
+### 面包屑路径（`GET /api/library/path/{folder_id}`）
+
+```json
+[
+  { "id": null, "name": "Library" },
+  { "id": "uuid", "name": "Research" },
+  { "id": "uuid", "name": "CT Scans" }
+]
+```
+
+### 批量移动（`POST /api/library/batch-move`）
+
+```json
+{
+  "items": [
+    { "type": "folder", "id": "uuid" },
+    { "type": "sample_set", "id": "uuid" }
+  ],
+  "target_folder_id": "uuid 或 null（根目录）"
+}
+```
+
+### 目录树响应（`GET /api/library/tree`）
+
+完整目录树（保留兼容，主要用于移动对话框的目录浏览）：
 
 ```json
 {
@@ -116,6 +176,10 @@ JWT 默认 24 小时过期。过期后需重新登录。
   ]
 }
 ```
+
+### 名称唯一性约束
+
+同一目录下（包括根目录），文件夹名称和样本集名称合并去重，不允许同名。创建、重命名、移动操作在目标目录有同名项时返回 `409 Conflict`（错误码 `403006`）。
 
 ---
 

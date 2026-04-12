@@ -33,6 +33,10 @@ async def create_sample_set(
     description: str | None = None,
     folder_id: uuid.UUID | None = None,
 ) -> SampleSet:
+    from app.services.library import _check_name_unique
+
+    await _check_name_unique(session, folder_id, owner_id, name)
+
     ss = SampleSet(
         name=name,
         description=description,
@@ -71,6 +75,17 @@ async def update_sample_set(
     description: str | None = None,
     folder_id: uuid.UUID | None = None,
 ) -> SampleSet:
+    new_name = name if name is not None else sample_set.name
+    new_folder = folder_id if folder_id is not None else sample_set.folder_id
+
+    if name is not None or folder_id is not None:
+        from app.services.library import _check_name_unique
+
+        await _check_name_unique(
+            session, new_folder, sample_set.owner_id, new_name,
+            exclude_sample_set_id=sample_set.id,
+        )
+
     if name is not None:
         sample_set.name = name
     if description is not None:

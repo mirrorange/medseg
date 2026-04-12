@@ -1,7 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlmodel import select
+from sqlmodel import col, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.exceptions import AppError
@@ -10,7 +10,11 @@ from app.models.sample_set import SampleSet
 from app.models.share import Share
 from app.models.user import User
 from app.schemas.library import (
+    BatchMoveItem,
+    BreadcrumbItem,
     FolderTreeNode,
+    LibraryContents,
+    LibraryItem,
     LibraryTree,
     SharedSampleSetRead,
     TreeSampleSet,
@@ -62,6 +66,15 @@ class NotShared(AppError):
         )
 
 
+class DuplicateName(AppError):
+    def __init__(self):
+        super().__init__(
+            error_code=403006,
+            message_key="library.duplicateName",
+            status_code=409,
+        )
+
+
 # --------------- Folder CRUD ---------------
 
 
@@ -73,6 +86,8 @@ async def create_folder(
 ) -> Folder:
     if parent_id is not None:
         await _get_owned_folder(session, parent_id, owner_id)
+
+    await _check_name_unique(session, parent_id, owner_id, name)
 
     folder = Folder(name=name, owner_id=owner_id, parent_id=parent_id)
     session.add(folder)
@@ -95,6 +110,15 @@ async def update_folder(
     name: str | None = None,
     parent_id: uuid.UUID | None = None,
 ) -> Folder:
+    new_name = name if name is not None else folder.name
+    new_parent = parent_id if parent_id is not None else folder.parent_id
+
+    if name is not None or parent_id is not None:
+        await _check_name_unique(
+            session, new_parent, folder.owner_id, new_name,
+            exclude_folder_id=folder.id,
+        )
+
     if name is not None:
         folder.name = name
 
@@ -197,6 +221,190 @@ async def get_library_tree(
         folders=root_folders,
         root_sample_sets=ss_by_folder.get(None, []),
     )
+
+
+# --------------- Library contents (flat view) ---------------
+
+
+async def get_library_contents(
+    session: AsyncSession,
+    owner_id: uuid.UUID,
+    folder_id: uuid.UUID | None = None,
+    sort_by: str = "name",
+    sort_order: str = "asc",
+) -> LibraryContents:
+    if folder_id is not None:
+        await _get_owned_folder(session, folder_id, owner_id)
+
+    breadcrumb = await get_folder_breadcrumb(session, folder_id, owner_id)
+
+    # Fetch folders in this directory
+    folder_query = select(Folder).where(
+        Folder.owner_id == owner_id,
+    )
+    if folder_id is None:
+        folder_query = folder_query.where(col(Folder.parent_id).is_(None))
+    else:
+        folder_query = folder_query.where(Folder.parent_id == folder_id)
+
+    folders = list((await session.exec(folder_query)).all())
+
+    # Count children for each folder
+    folder_child_counts: dict[uuid.UUID, int] = {}
+    for f in folders:
+        sub_folders = await session.exec(
+            select(func.count()).select_from(Folder).where(Folder.parent_id == f.id)
+        )
+        sub_ss = await session.exec(
+            select(func.count()).select_from(SampleSet).where(SampleSet.folder_id == f.id)
+        )
+        folder_child_counts[f.id] = (sub_folders.one() or 0) + (sub_ss.one() or 0)
+
+    # Fetch sample sets in this directory
+    ss_query = select(SampleSet).where(
+        SampleSet.owner_id == owner_id,
+    )
+    if folder_id is None:
+        ss_query = ss_query.where(col(SampleSet.folder_id).is_(None))
+    else:
+        ss_query = ss_query.where(SampleSet.folder_id == folder_id)
+
+    sample_sets = list((await session.exec(ss_query)).all())
+
+    # Build unified items
+    items: list[LibraryItem] = []
+    for f in folders:
+        items.append(LibraryItem(
+            id=f.id,
+            name=f.name,
+            type="folder",
+            child_count=folder_child_counts.get(f.id, 0),
+            created_at=f.created_at,
+            updated_at=f.updated_at,
+        ))
+    for ss in sample_sets:
+        items.append(LibraryItem(
+            id=ss.id,
+            name=ss.name,
+            type="sample_set",
+            description=ss.description,
+            created_at=ss.created_at,
+            updated_at=ss.updated_at,
+        ))
+
+    # Sort: folders first, then sample_sets; within each group sort by field
+    sort_key = sort_by if sort_by in ("name", "created_at", "updated_at") else "name"
+    reverse = sort_order == "desc"
+
+    def item_sort_key(item: LibraryItem):
+        type_order = 0 if item.type == "folder" else 1
+        val = getattr(item, sort_key)
+        if isinstance(val, str):
+            val = val.lower()
+        return (type_order, val)
+
+    items.sort(key=item_sort_key, reverse=reverse)
+    # When reversed, we still want folders before sample_sets
+    if reverse:
+        folders_items = [i for i in items if i.type == "folder"]
+        ss_items = [i for i in items if i.type == "sample_set"]
+        items = folders_items + ss_items
+
+    return LibraryContents(
+        folder_id=folder_id,
+        breadcrumb=breadcrumb,
+        items=items,
+    )
+
+
+async def get_folder_breadcrumb(
+    session: AsyncSession,
+    folder_id: uuid.UUID | None,
+    owner_id: uuid.UUID,
+) -> list[BreadcrumbItem]:
+    if folder_id is None:
+        return []
+
+    # Walk up from folder_id to root
+    ancestors: list[BreadcrumbItem] = []
+    current_id: uuid.UUID | None = folder_id
+    visited: set[uuid.UUID] = set()
+    for _ in range(50):  # max depth guard
+        if current_id is None:
+            break
+        if current_id in visited:
+            break
+        visited.add(current_id)
+        result = await session.exec(
+            select(Folder).where(Folder.id == current_id, Folder.owner_id == owner_id)
+        )
+        folder = result.first()
+        if folder is None:
+            raise FolderNotFound()
+        ancestors.append(BreadcrumbItem(id=folder.id, name=folder.name))
+        current_id = folder.parent_id
+
+    ancestors.reverse()
+    return ancestors
+
+
+# --------------- Batch move ---------------
+
+
+async def batch_move_items(
+    session: AsyncSession,
+    owner_id: uuid.UUID,
+    target_folder_id: uuid.UUID | None,
+    items: list[BatchMoveItem],
+) -> None:
+    # Validate target folder
+    if target_folder_id is not None:
+        await _get_owned_folder(session, target_folder_id, owner_id)
+
+    for item in items:
+        item_type, item_id = item.type, item.id
+        if item_type == "folder":
+            folder = await _get_owned_folder(session, item_id, owner_id)
+            # Skip if already in target
+            if folder.parent_id == target_folder_id:
+                continue
+            # Cycle detection
+            if target_folder_id is not None:
+                if target_folder_id == item_id:
+                    raise CircularFolder()
+                await _check_no_cycle(session, target_folder_id, item_id)
+            # Uniqueness check
+            await _check_name_unique(
+                session, target_folder_id, owner_id, folder.name,
+                exclude_folder_id=folder.id,
+            )
+            folder.parent_id = target_folder_id
+            folder.updated_at = datetime.now(UTC)
+            session.add(folder)
+
+        elif item_type == "sample_set":
+            result = await session.exec(
+                select(SampleSet).where(
+                    SampleSet.id == item_id, SampleSet.owner_id == owner_id,
+                )
+            )
+            ss = result.first()
+            if ss is None:
+                from app.services.sample_set import SampleSetNotFound
+                raise SampleSetNotFound()
+            # Skip if already in target
+            if ss.folder_id == target_folder_id:
+                continue
+            # Uniqueness check
+            await _check_name_unique(
+                session, target_folder_id, owner_id, ss.name,
+                exclude_sample_set_id=ss.id,
+            )
+            ss.folder_id = target_folder_id
+            ss.updated_at = datetime.now(UTC)
+            session.add(ss)
+
+    await session.commit()
 
 
 # --------------- Share ---------------
@@ -364,3 +572,43 @@ async def _check_no_cycle(
             select(Folder.parent_id).where(Folder.id == current_id)
         )
         current_id = result.first()
+
+
+async def _check_name_unique(
+    session: AsyncSession,
+    parent_id: uuid.UUID | None,
+    owner_id: uuid.UUID,
+    name: str,
+    exclude_folder_id: uuid.UUID | None = None,
+    exclude_sample_set_id: uuid.UUID | None = None,
+) -> None:
+    """Check that no folder or sample set with the given name exists in the target directory."""
+    # Check folders
+    folder_query = select(Folder).where(
+        Folder.owner_id == owner_id,
+        Folder.name == name,
+    )
+    if parent_id is None:
+        folder_query = folder_query.where(col(Folder.parent_id).is_(None))
+    else:
+        folder_query = folder_query.where(Folder.parent_id == parent_id)
+    if exclude_folder_id is not None:
+        folder_query = folder_query.where(Folder.id != exclude_folder_id)
+
+    if (await session.exec(folder_query)).first() is not None:
+        raise DuplicateName()
+
+    # Check sample sets
+    ss_query = select(SampleSet).where(
+        SampleSet.owner_id == owner_id,
+        SampleSet.name == name,
+    )
+    if parent_id is None:
+        ss_query = ss_query.where(col(SampleSet.folder_id).is_(None))
+    else:
+        ss_query = ss_query.where(SampleSet.folder_id == parent_id)
+    if exclude_sample_set_id is not None:
+        ss_query = ss_query.where(SampleSet.id != exclude_sample_set_id)
+
+    if (await session.exec(ss_query)).first() is not None:
+        raise DuplicateName()

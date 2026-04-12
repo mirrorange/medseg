@@ -352,16 +352,23 @@ async def require_owner(resource_owner_id: UUID, user: User = Depends(get_curren
 
 #### 样本库 (`/api/library`)
 
+样本库采用类文件系统的虚拟目录结构，支持文件夹和样本集的浏览、创建、重命名、移动、删除操作。
+
 | 方法 | 路径 | 说明 | 权限 |
 | --- | --- | --- | --- |
-| GET | `/api/library/tree` | 获取当前用户目录树 | 已认证 |
-| POST | `/api/library/folders` | 创建文件夹 | 已认证 |
+| GET | `/api/library/contents` | 获取指定目录下的内容（扁平列表） | 已认证 |
+| GET | `/api/library/tree` | 获取完整目录树（用于移动对话框等） | 已认证 |
+| GET | `/api/library/path/{folder_id}` | 获取文件夹面包屑路径（祖先链） | 已认证 |
+| POST | `/api/library/folders` | 创建文件夹（强制同目录名称唯一） | 已认证 |
 | PUT | `/api/library/folders/{folder_id}` | 重命名/移动文件夹 | 所有者 |
 | DELETE | `/api/library/folders/{folder_id}` | 删除文件夹 | 所有者 |
+| POST | `/api/library/batch-move` | 批量移动文件夹/样本集到目标目录 | 所有者 |
 | GET | `/api/library/shared` | 浏览共享样本库 | 已认证 |
 | POST | `/api/library/shared/{sample_set_id}` | 发布到共享库 | 所有者 |
 | DELETE | `/api/library/shared/{sample_set_id}` | 撤回共享 | 所有者 |
 | POST | `/api/library/shared/{sample_set_id}/copy` | 复制到个人库 | 已认证 |
+
+**名称唯一性约束**：同一目录下（包括根目录），文件夹与样本集的名称不允许重复。创建、重命名、移动操作均需校验目标目录下的名称唯一性。
 
 #### 样本集 (`/api/sample-sets`)
 
@@ -779,9 +786,205 @@ class ConnectionManager:
 | 400xxx | 认证与授权 | 400001 凭证无效、400002 令牌过期、400003 权限不足 |
 | 401xxx | 用户管理 | 401001 用户已存在、401002 用户不存在 |
 | 402xxx | 样本管理 | 402001 样本集不存在、402002 子集名称冲突 |
-| 403xxx | 图像管理 | 403001 图像格式不支持、403002 文件过大 |
+| 403xxx | 样本库 | 403001 文件夹不存在、403002 文件夹非空、403003 循环引用、403004 已共享、403005 未共享、403006 名称重复 |
 | 404xxx | 管线与任务 | 404001 模块不存在、404002 模块不可用、404003 资源不足 |
 | 500xxx | 系统级 | 500000 内部错误（已有） |
+
+---
+
+## 10.1 · 样本库 V2 — API 详细设计
+
+样本库 V2 将样本库从简单的目录树升级为类文件系统的虚拟文件管理器，提供扁平列表浏览、批量移动、名称唯一性约束等能力。
+
+### 10.1.1 核心 API
+
+#### `GET /api/library/contents` — 获取目录内容
+
+获取指定文件夹下的所有子文件夹和样本集（扁平列表，非递归）。
+
+**查询参数**：
+
+| 参数 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `folder_id` | UUID (nullable) | `null` | 目标文件夹 ID，`null` 表示根目录 |
+| `sort_by` | `name` \| `created_at` \| `updated_at` | `name` | 排序字段 |
+| `sort_order` | `asc` \| `desc` | `asc` | 排序方向 |
+
+**响应**：
+
+```json
+{
+  "folder_id": "uuid | null",
+  "breadcrumb": [
+    { "id": null, "name": "Library" },
+    { "id": "uuid-1", "name": "CT Scans" }
+  ],
+  "items": [
+    {
+      "id": "uuid",
+      "name": "Patient Group A",
+      "type": "folder",
+      "created_at": "2026-04-12T...",
+      "updated_at": "2026-04-12T...",
+      "child_count": 5
+    },
+    {
+      "id": "uuid",
+      "name": "Study-001",
+      "type": "sample_set",
+      "description": "Lung CT study",
+      "created_at": "2026-04-12T...",
+      "updated_at": "2026-04-12T..."
+    }
+  ]
+}
+```
+
+**排序规则**：文件夹始终排在样本集前面（类似文件管理器中目录排在文件前面），同类型内按指定字段排序。
+
+#### `GET /api/library/path/{folder_id}` — 获取面包屑路径
+
+返回从根目录到指定文件夹的祖先链，用于前端面包屑导航。
+
+**响应**：
+
+```json
+[
+  { "id": null, "name": "Library" },
+  { "id": "uuid-parent", "name": "Research" },
+  { "id": "uuid-current", "name": "CT Scans" }
+]
+```
+
+#### `POST /api/library/batch-move` — 批量移动
+
+将多个文件夹和/或样本集移动到目标文件夹。
+
+**请求**：
+
+```json
+{
+  "items": [
+    { "type": "folder", "id": "uuid-1" },
+    { "type": "sample_set", "id": "uuid-2" }
+  ],
+  "target_folder_id": "uuid | null"
+}
+```
+
+**校验规则**：
+- 目标文件夹必须存在且属于当前用户（`null` 表示根目录）
+- 不允许将文件夹移动到自身或其子孙目录下（循环引用检测）
+- 移动后目标目录下名称不允许重复
+- 所有待移动项必须属于当前用户
+
+**响应**：`200 OK`，返回移动后的 items 列表。
+
+### 10.1.2 Schema 变更
+
+新增 Schema 定义：
+
+```python
+# app/schemas/library.py — 新增
+
+class BreadcrumbItem(BaseModel):
+    id: uuid.UUID | None
+    name: str
+
+class LibraryItem(BaseModel):
+    """目录内容中的统一项（文件夹或样本集）"""
+    id: uuid.UUID
+    name: str
+    type: Literal["folder", "sample_set"]
+    description: str | None = None       # 仅样本集有
+    child_count: int | None = None       # 仅文件夹有
+    created_at: datetime
+    updated_at: datetime
+
+class LibraryContents(BaseModel):
+    folder_id: uuid.UUID | None
+    breadcrumb: list[BreadcrumbItem]
+    items: list[LibraryItem]
+
+class BatchMoveRequest(BaseModel):
+    items: list[BatchMoveItem]
+    target_folder_id: uuid.UUID | None = None
+
+class BatchMoveItem(BaseModel):
+    type: Literal["folder", "sample_set"]
+    id: uuid.UUID
+```
+
+### 10.1.3 Service 层变更
+
+`app/services/library.py` 新增/修改：
+
+| 函数 | 说明 |
+| --- | --- |
+| `get_library_contents()` | 查询指定目录下的文件夹和样本集，构建 `LibraryContents` 响应 |
+| `get_folder_breadcrumb()` | 从指定文件夹向上遍历至根，返回面包屑路径 |
+| `batch_move_items()` | 批量移动操作，含循环引用检测和名称唯一性校验 |
+| `check_name_unique()` | 检查目标目录下名称是否唯一（跨文件夹和样本集） |
+| `create_folder()` | **修改**：增加名称唯一性校验 |
+| `update_folder()` | **修改**：重命名/移动时增加名称唯一性校验 |
+
+新增异常：
+
+```python
+class DuplicateName(AppError):
+    def __init__(self):
+        super().__init__(
+            error_code=403006,
+            message_key="library.duplicateName",
+            status_code=409,
+        )
+```
+
+### 10.1.4 名称唯一性约束
+
+**规则**：在同一个父目录（`parent_id` / `folder_id`）下，所有文件夹名称和样本集名称合并去重，不允许存在同名项。
+
+**校验时机**：
+1. 创建文件夹时（`create_folder`）
+2. 创建样本集时（`create_sample_set`）
+3. 重命名文件夹时（`update_folder`）
+4. 重命名样本集时（`update_sample_set`）
+5. 移动文件夹时（`update_folder` / `batch_move`）
+6. 移动样本集时（`update_sample_set` / `batch_move`）
+
+**实现**：
+
+```python
+async def check_name_unique(
+    session: AsyncSession,
+    parent_id: uuid.UUID | None,
+    owner_id: uuid.UUID,
+    name: str,
+    exclude_folder_id: uuid.UUID | None = None,
+    exclude_sample_set_id: uuid.UUID | None = None,
+) -> None:
+    """检查同目录下名称唯一性，排除自身（用于重命名场景）"""
+    # 检查文件夹
+    folder_query = select(Folder).where(
+        Folder.owner_id == owner_id,
+        Folder.parent_id == parent_id,  # 使用 is_(None) 处理 null
+        Folder.name == name,
+    )
+    if exclude_folder_id:
+        folder_query = folder_query.where(Folder.id != exclude_folder_id)
+
+    # 检查样本集
+    ss_query = select(SampleSet).where(
+        SampleSet.owner_id == owner_id,
+        SampleSet.folder_id == parent_id,
+        SampleSet.name == name,
+    )
+    if exclude_sample_set_id:
+        ss_query = ss_query.where(SampleSet.id != exclude_sample_set_id)
+
+    if (await session.exec(folder_query)).first() or (await session.exec(ss_query)).first():
+        raise DuplicateName()
+```
 
 ---
 

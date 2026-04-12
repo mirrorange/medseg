@@ -1,6 +1,7 @@
 import uuid
+from typing import Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.dependencies import get_current_user
@@ -8,18 +9,24 @@ from app.core.exceptions import PermissionDenied
 from app.db import get_session
 from app.models.user import User, UserRole
 from app.schemas.library import (
+    BatchMoveRequest,
+    BreadcrumbItem,
     FolderCreate,
     FolderRead,
     FolderUpdate,
+    LibraryContents,
     LibraryTree,
     SharedSampleSetRead,
 )
 from app.schemas.sample import SampleSetRead
 from app.services.library import (
+    batch_move_items,
     copy_shared_sample_set,
     create_folder,
     delete_folder,
     get_folder,
+    get_folder_breadcrumb,
+    get_library_contents,
     get_library_tree,
     list_shared_sample_sets,
     share_sample_set,
@@ -29,6 +36,34 @@ from app.services.library import (
 from app.services.sample_set import get_sample_set
 
 router = APIRouter(prefix="/library", tags=["library"])
+
+
+# --------------- Contents (flat view) ---------------
+
+
+@router.get("/contents", response_model=LibraryContents)
+async def contents(
+    folder_id: uuid.UUID | None = Query(None),
+    sort_by: Literal["name", "created_at", "updated_at"] = Query("name"),
+    sort_order: Literal["asc", "desc"] = Query("asc"),
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    return await get_library_contents(
+        session, user.id, folder_id=folder_id, sort_by=sort_by, sort_order=sort_order,
+    )
+
+
+# --------------- Breadcrumb ---------------
+
+
+@router.get("/path/{folder_id}", response_model=list[BreadcrumbItem])
+async def path(
+    folder_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    return await get_folder_breadcrumb(session, folder_id, user.id)
 
 
 # --------------- Tree ---------------
@@ -78,6 +113,18 @@ async def delete(
 ):
     folder = await get_folder(session, folder_id, user.id)
     await delete_folder(session, folder, recursive=recursive)
+
+
+# --------------- Batch move ---------------
+
+
+@router.post("/batch-move", status_code=204)
+async def batch_move(
+    body: BatchMoveRequest,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    await batch_move_items(session, user.id, body.target_folder_id, body.items)
 
 
 # --------------- Shared library ---------------
