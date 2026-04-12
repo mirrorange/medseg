@@ -13,5 +13,10 @@ export default [
     route("app/sample-sets/:id", "routes/sample-set.$id.tsx"),
     route("app/tasks", "routes/tasks.tsx"),
     route("app/viewer/:setId/:subsetId", "routes/viewer.$setId.$subsetId.tsx"),
+
+    // Admin routes
+    route("app/admin/users", "routes/admin.users.tsx"),
+    route("app/admin/modules", "routes/admin.modules.tsx"),
+    route("app/admin/sample-sets", "routes/admin.sample-sets.tsx"),
   ]),
 ] satisfies RouteConfig;

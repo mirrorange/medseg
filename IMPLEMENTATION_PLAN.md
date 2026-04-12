@@ -59,4 +59,4 @@
 - 全局浏览所有用户样本集
 - 统计卡片展示
 **Tests**: 管理员操作流程
-**Status**: Not Started
+**Status**: Complete
