@@ -156,20 +156,30 @@ export const useSampleSetStore = create<SampleSetBrowserState>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
+      // Always refresh top-level sampleSet (for subsets list freshness)
+      const [detailRes, awarenessRes] = await Promise.all([
+        getDetailApiSampleSetsSampleSetIdGet({ path: { sample_set_id: sampleSetId } }),
+        getAwarenessApiPipelinesAwarenessSampleSetIdGet({ path: { sample_set_id: sampleSetId } }),
+      ]);
+      if (!detailRes.data) throw new Error("Failed to refresh");
+
+      const updates: Partial<SampleSetBrowserState> = {
+        sampleSet: detailRes.data,
+        awareness: awarenessRes.data ?? null,
+        isLoading: false,
+      };
+
+      // Also refresh current subset if at images level
       if (level === "images" && currentSubsetId) {
         const { data } = await getDetailApiSampleSetsSampleSetIdSubsetsSubsetIdGet({
           path: { sample_set_id: sampleSetId, subset_id: currentSubsetId },
         });
-        if (!data) throw new Error("Failed to refresh");
-        set({ currentSubset: data, isLoading: false });
-      } else {
-        const [detailRes, awarenessRes] = await Promise.all([
-          getDetailApiSampleSetsSampleSetIdGet({ path: { sample_set_id: sampleSetId } }),
-          getAwarenessApiPipelinesAwarenessSampleSetIdGet({ path: { sample_set_id: sampleSetId } }),
-        ]);
-        if (!detailRes.data) throw new Error("Failed to refresh");
-        set({ sampleSet: detailRes.data, awareness: awarenessRes.data ?? null, isLoading: false });
+        if (data) {
+          updates.currentSubset = data;
+        }
       }
+
+      set(updates);
     } catch (err) {
       set({ isLoading: false, error: err instanceof Error ? err.message : "Failed to refresh" });
     }
