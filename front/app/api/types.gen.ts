@@ -70,6 +70,66 @@ export type BatchMoveRequest = {
 };
 
 /**
+ * BatchTaskCreate
+ */
+export type BatchTaskCreate = {
+    /**
+     * Module Name
+     */
+    module_name: string;
+    /**
+     * Sample Set Id
+     */
+    sample_set_id: string;
+    /**
+     * Input Subset Ids
+     */
+    input_subset_ids: Array<string>;
+    /**
+     * Output Subset Name Template
+     */
+    output_subset_name_template?: string;
+    /**
+     * Params
+     */
+    params?: {
+        [key: string]: unknown;
+    } | null;
+};
+
+/**
+ * BatchTaskError
+ */
+export type BatchTaskError = {
+    /**
+     * Input Subset Id
+     */
+    input_subset_id: string;
+    /**
+     * Error Code
+     */
+    error_code: number;
+    /**
+     * Message
+     */
+    message: string;
+};
+
+/**
+ * BatchTaskResult
+ */
+export type BatchTaskResult = {
+    /**
+     * Tasks
+     */
+    tasks: Array<TaskRead>;
+    /**
+     * Errors
+     */
+    errors: Array<BatchTaskError>;
+};
+
+/**
  * Body_upload_api_sample_sets__sample_set_id__subsets__subset_id__images_post
  */
 export type BodyUploadApiSampleSetsSampleSetIdSubsetsSubsetIdImagesPost = {
@@ -225,6 +285,16 @@ export type ImageRead = {
      * Created At
      */
     created_at: string;
+};
+
+/**
+ * ImageUpdate
+ */
+export type ImageUpdate = {
+    /**
+     * Filename
+     */
+    filename?: string | null;
 };
 
 /**
@@ -1491,6 +1561,44 @@ export type GetMetaApiSampleSetsSampleSetIdSubsetsSubsetIdImagesImageIdGetRespon
 
 export type GetMetaApiSampleSetsSampleSetIdSubsetsSubsetIdImagesImageIdGetResponse = GetMetaApiSampleSetsSampleSetIdSubsetsSubsetIdImagesImageIdGetResponses[keyof GetMetaApiSampleSetsSampleSetIdSubsetsSubsetIdImagesImageIdGetResponses];
 
+export type UpdateApiSampleSetsSampleSetIdSubsetsSubsetIdImagesImageIdPutData = {
+    body: ImageUpdate;
+    path: {
+        /**
+         * Sample Set Id
+         */
+        sample_set_id: string;
+        /**
+         * Subset Id
+         */
+        subset_id: string;
+        /**
+         * Image Id
+         */
+        image_id: string;
+    };
+    query?: never;
+    url: '/api/sample-sets/{sample_set_id}/subsets/{subset_id}/images/{image_id}';
+};
+
+export type UpdateApiSampleSetsSampleSetIdSubsetsSubsetIdImagesImageIdPutErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UpdateApiSampleSetsSampleSetIdSubsetsSubsetIdImagesImageIdPutError = UpdateApiSampleSetsSampleSetIdSubsetsSubsetIdImagesImageIdPutErrors[keyof UpdateApiSampleSetsSampleSetIdSubsetsSubsetIdImagesImageIdPutErrors];
+
+export type UpdateApiSampleSetsSampleSetIdSubsetsSubsetIdImagesImageIdPutResponses = {
+    /**
+     * Successful Response
+     */
+    200: ImageRead;
+};
+
+export type UpdateApiSampleSetsSampleSetIdSubsetsSubsetIdImagesImageIdPutResponse = UpdateApiSampleSetsSampleSetIdSubsetsSubsetIdImagesImageIdPutResponses[keyof UpdateApiSampleSetsSampleSetIdSubsetsSubsetIdImagesImageIdPutResponses];
+
 export type DownloadApiSampleSetsSampleSetIdSubsetsSubsetIdImagesImageIdDownloadGetData = {
     body?: never;
     path: {
@@ -2069,6 +2177,31 @@ export type RunPipelineApiPipelinesRunPostResponses = {
 };
 
 export type RunPipelineApiPipelinesRunPostResponse = RunPipelineApiPipelinesRunPostResponses[keyof RunPipelineApiPipelinesRunPostResponses];
+
+export type BatchRunPipelineApiPipelinesBatchRunPostData = {
+    body: BatchTaskCreate;
+    path?: never;
+    query?: never;
+    url: '/api/pipelines/batch-run';
+};
+
+export type BatchRunPipelineApiPipelinesBatchRunPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BatchRunPipelineApiPipelinesBatchRunPostError = BatchRunPipelineApiPipelinesBatchRunPostErrors[keyof BatchRunPipelineApiPipelinesBatchRunPostErrors];
+
+export type BatchRunPipelineApiPipelinesBatchRunPostResponses = {
+    /**
+     * Successful Response
+     */
+    201: BatchTaskResult;
+};
+
+export type BatchRunPipelineApiPipelinesBatchRunPostResponse = BatchRunPipelineApiPipelinesBatchRunPostResponses[keyof BatchRunPipelineApiPipelinesBatchRunPostResponses];
 
 export type ListMyTasksApiTasksGetData = {
     body?: never;

@@ -1,22 +1,18 @@
 import { useState, useCallback } from "react";
-import { redirect, useRevalidator } from "react-router";
+import { redirect } from "react-router";
 import type { Route } from "./+types/sample-set.$id";
-import { Pencil, Trash2, Share2 } from "lucide-react";
-import { Button } from "~/components/ui/button";
-import { Badge } from "~/components/ui/badge";
+import { toast } from "sonner";
 import {
   getDetailApiSampleSetsSampleSetIdGet,
   deleteApiSampleSetsSampleSetIdDelete,
   deleteApiSampleSetsSampleSetIdSubsetsSubsetIdDelete,
+  deleteApiSampleSetsSampleSetIdSubsetsSubsetIdImagesImageIdDelete,
   publishSharedApiLibrarySharedSampleSetIdPost,
-  unpublishSharedApiLibrarySharedSampleSetIdDelete,
 } from "~/api";
-import type { ModuleAwarenessItem } from "~/api/types.gen";
-import { SubsetList } from "~/features/sample-set/subset-list";
-import { ImageUpload } from "~/features/sample-set/image-upload";
-import { PipelineAwareness } from "~/features/sample-set/pipeline-awareness";
-import { RunPipelineDialog } from "~/features/sample-set/run-pipeline-dialog";
+import type { SubsetRead, ImageRead } from "~/api/types.gen";
+import { SampleSetBrowser } from "~/features/sample-set/sample-set-browser";
 import { ConfirmDialog } from "~/components/confirm-dialog";
+import { useSampleSetStore } from "~/stores/sample-set";
 
 export function meta({ data }: Route.MetaArgs) {
   return [{ title: `${data?.sampleSet?.name ?? "Sample Set"} - MedSeg Cloud` }];
@@ -34,27 +30,32 @@ export default function SampleSetDetailPage({
   loaderData,
 }: Route.ComponentProps) {
   const { sampleSet } = loaderData;
-  const revalidator = useRevalidator();
 
   // Delete sample set
   const [deleteSSOpen, setDeleteSSOpen] = useState(false);
   const [deleteSSLoading, setDeleteSSLoading] = useState(false);
 
-  // Delete subset
-  const [deleteSubsetOpen, setDeleteSubsetOpen] = useState(false);
-  const [deleteSubsetId, setDeleteSubsetId] = useState<string | null>(null);
-  const [deleteSubsetName, setDeleteSubsetName] = useState("");
-  const [deleteSubsetLoading, setDeleteSubsetLoading] = useState(false);
+  // Delete confirmation (subsets or images)
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteDescription, setDeleteDescription] = useState("");
 
-  // Run pipeline
-  const [runPipelineOpen, setRunPipelineOpen] = useState(false);
-  const [selectedModule, setSelectedModule] =
-    useState<ModuleAwarenessItem | null>(null);
+  // Context menu (placeholder for Stage 5)
+  const handleContextMenu = useCallback(
+    (_e: React.MouseEvent, _item: SubsetRead | ImageRead | null) => {
+      // Will be implemented in Stage 5
+    },
+    [],
+  );
 
-  const refresh = useCallback(() => {
-    revalidator.revalidate();
-  }, [revalidator]);
+  // Share
+  const handleShare = useCallback(() => {
+    publishSharedApiLibrarySharedSampleSetIdPost({
+      path: { sample_set_id: sampleSet.id },
+    }).then(() => toast.success("Sample set shared"));
+  }, [sampleSet.id]);
 
+  // Delete sample set
   async function handleDeleteSampleSet() {
     setDeleteSSLoading(true);
     await deleteApiSampleSetsSampleSetIdDelete({
@@ -64,97 +65,71 @@ export default function SampleSetDetailPage({
     window.location.href = "/app/library";
   }
 
-  function handleDeleteSubset(subsetId: string, name: string) {
-    setDeleteSubsetId(subsetId);
-    setDeleteSubsetName(name);
-    setDeleteSubsetOpen(true);
+  // Delete selected items
+  const handleDeleteSelected = useCallback(() => {
+    const store = useSampleSetStore.getState();
+    const count = store.selectedIds.length;
+    if (count === 0) return;
+
+    const noun = store.level === "subsets" ? "subset" : "image";
+    setDeleteDescription(
+      `Are you sure you want to delete ${count} ${noun}${count > 1 ? "s" : ""}? This action cannot be undone.`,
+    );
+    setDeleteOpen(true);
+  }, []);
+
+  async function confirmDeleteSelected() {
+    const store = useSampleSetStore.getState();
+    const ids = [...store.selectedIds];
+    setDeleteLoading(true);
+
+    if (store.level === "subsets") {
+      for (const id of ids) {
+        await deleteApiSampleSetsSampleSetIdSubsetsSubsetIdDelete({
+          path: { sample_set_id: sampleSet.id, subset_id: id },
+        });
+      }
+    } else if (store.currentSubsetId) {
+      for (const id of ids) {
+        await deleteApiSampleSetsSampleSetIdSubsetsSubsetIdImagesImageIdDelete({
+          path: {
+            sample_set_id: sampleSet.id,
+            subset_id: store.currentSubsetId,
+            image_id: id,
+          },
+        });
+      }
+    }
+
+    setDeleteLoading(false);
+    setDeleteOpen(false);
+    store.clearSelection();
+    void store.refresh();
   }
 
-  async function confirmDeleteSubset() {
-    if (!deleteSubsetId) return;
-    setDeleteSubsetLoading(true);
-    await deleteApiSampleSetsSampleSetIdSubsetsSubsetIdDelete({
-      path: { sample_set_id: sampleSet.id, subset_id: deleteSubsetId },
-    });
-    setDeleteSubsetLoading(false);
-    setDeleteSubsetOpen(false);
-    refresh();
-  }
+  // Placeholder callbacks for Stage 6
+  const handleCreateSubset = useCallback(() => {
+    // Will be implemented in Stage 6
+    toast.info("Create subset dialog coming in Stage 6");
+  }, []);
 
-  // Find the first "raw" subset for image upload (optional)
-  const rawSubset = sampleSet.subsets?.find((s) => s.type === "raw");
+  const handleUploadImages = useCallback(() => {
+    // Will be implemented in Stage 6
+    toast.info("Upload dialog coming in Stage 6");
+  }, []);
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {sampleSet.name}
-          </h1>
-          {sampleSet.description && (
-            <p className="mt-1 text-muted-foreground">
-              {sampleSet.description}
-            </p>
-          )}
-          <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
-            <span>
-              Created {new Date(sampleSet.created_at).toLocaleDateString()}
-            </span>
-            <span>·</span>
-            <span>{sampleSet.subsets?.length ?? 0} subsets</span>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              publishSharedApiLibrarySharedSampleSetIdPost({
-                path: { sample_set_id: sampleSet.id },
-              })
-            }
-          >
-            <Share2 className="mr-2 h-4 w-4" />
-            Share
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-destructive"
-            onClick={() => setDeleteSSOpen(true)}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </Button>
-        </div>
-      </div>
-
-      {/* Image upload — always visible; auto-creates raw subset if needed */}
-      <ImageUpload
+    <div className="flex h-[calc(100vh-4rem)] flex-col">
+      <SampleSetBrowser
         sampleSetId={sampleSet.id}
-        subsetId={rawSubset?.id}
-        onUploaded={refresh}
+        sampleSetName={sampleSet.name}
+        onCreateSubset={handleCreateSubset}
+        onUploadImages={handleUploadImages}
+        onDeleteSelected={handleDeleteSelected}
+        onShare={handleShare}
+        onDeleteSampleSet={() => setDeleteSSOpen(true)}
+        onContextMenu={handleContextMenu}
       />
-
-      {/* Pipeline Awareness */}
-      <PipelineAwareness
-        sampleSetId={sampleSet.id}
-        onRunModule={(item) => {
-          setSelectedModule(item);
-          setRunPipelineOpen(true);
-        }}
-      />
-
-      {/* Subsets */}
-      <div>
-        <h2 className="mb-3 text-lg font-semibold">Subsets</h2>
-        <SubsetList
-          subsets={sampleSet.subsets ?? []}
-          sampleSetId={sampleSet.id}
-          onDelete={handleDeleteSubset}
-        />
-      </div>
 
       {/* Dialogs */}
       <ConfirmDialog
@@ -167,21 +142,13 @@ export default function SampleSetDetailPage({
         destructive
       />
       <ConfirmDialog
-        open={deleteSubsetOpen}
-        onOpenChange={setDeleteSubsetOpen}
-        title="Delete Subset"
-        description={`Are you sure you want to delete "${deleteSubsetName}"? All images in this subset will be permanently deleted.`}
-        onConfirm={confirmDeleteSubset}
-        loading={deleteSubsetLoading}
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Delete Selected"
+        description={deleteDescription}
+        onConfirm={confirmDeleteSelected}
+        loading={deleteLoading}
         destructive
-      />
-      <RunPipelineDialog
-        open={runPipelineOpen}
-        onOpenChange={setRunPipelineOpen}
-        sampleSetId={sampleSet.id}
-        subsets={sampleSet.subsets ?? []}
-        preselectedModule={selectedModule}
-        onSubmitted={refresh}
       />
     </div>
   );

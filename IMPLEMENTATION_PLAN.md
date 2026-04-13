@@ -18,7 +18,7 @@
 **Goal**: 创建 SampleSet Store (Zustand) 和浏览器骨架组件
 **Success Criteria**: 样本集详情页可加载子集列表并切换层级（subsets ↔ images）
 **Tests**: 页面可正确渲染、切换层级不报错
-**Status**: Not Started
+**Status**: Complete
 
 ## Stage 4: Frontend — 列表/网格视图 + 框选
 **Goal**: 实现双视图（列表/网格）和鼠标框选
