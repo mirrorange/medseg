@@ -75,3 +75,16 @@ async def delete_image(
         await storage.delete(image.storage_path)
     await session.delete(image)
     await session.commit()
+
+
+async def update_image(
+    session: AsyncSession,
+    image: Image,
+    filename: str | None = None,
+) -> Image:
+    if filename is not None:
+        image.filename = filename
+    session.add(image)
+    await session.commit()
+    await session.refresh(image)
+    return image

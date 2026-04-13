@@ -8,8 +8,8 @@ from app.api.dependencies import get_current_user
 from app.core.exceptions import PermissionDenied
 from app.db import get_session
 from app.models.user import User, UserRole
-from app.schemas.sample import ImageRead
-from app.services.image import delete_image, get_image, list_images, upload_image
+from app.schemas.sample import ImageRead, ImageUpdate
+from app.services.image import delete_image, get_image, list_images, update_image, upload_image
 from app.services.sample_set import get_sample_set
 from app.services.subset import get_subset
 from app.storage import get_storage
@@ -98,6 +98,22 @@ async def download(
         media_type="application/octet-stream",
         headers={"Content-Disposition": f'attachment; filename="{image.filename}"'},
     )
+
+
+@router.put("/{image_id}", response_model=ImageRead)
+async def update(
+    sample_set_id: uuid.UUID,
+    subset_id: uuid.UUID,
+    image_id: uuid.UUID,
+    body: ImageUpdate,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    await _verify_image_access(session, sample_set_id, subset_id, user)
+    image = await get_image(session, image_id)
+    if image.subset_id != subset_id:
+        raise PermissionDenied()
+    return await update_image(session, image, body.filename)
 
 
 @router.delete("/{image_id}", status_code=204)

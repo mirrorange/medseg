@@ -59,6 +59,10 @@ class SubsetCreate(BaseModel):
 # --- Image ---
 
 
+class ImageUpdate(BaseModel):
+    filename: str | None = None
+
+
 class ImageRead(BaseModel):
     id: uuid.UUID
     subset_id: uuid.UUID

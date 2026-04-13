@@ -2,9 +2,9 @@
 
 | 项目 | 值 |
 | --- | --- |
-| 文档版本 | v1.0 |
-| 对应 PRD 版本 | v1.0 |
-| 日期 | 2026-04-11 |
+| 文档版本 | v1.1 |
+| 对应 PRD 版本 | v1.1 |
+| 日期 | 2026-04-13 |
 | 状态 | Draft |
 
 ---
@@ -395,6 +395,7 @@ async def require_owner(resource_owner_id: UUID, user: User = Depends(get_curren
 | POST | `/api/sample-sets/{set_id}/subsets/{subset_id}/images` | 上传图像（multipart） | 所有者 |
 | GET | `/api/.../images/{id}` | 获取图像元数据 | 所有者/管理员 |
 | GET | `/api/.../images/{id}/download` | 下载图像文件 | 所有者/管理员 |
+| PUT | `/api/.../images/{id}` | 更新图像信息（重命名） | 所有者 |
 | DELETE | `/api/.../images/{id}` | 删除图像 | 所有者 |
 
 #### 管线 (`/api/pipelines`)
@@ -404,6 +405,7 @@ async def require_owner(resource_owner_id: UUID, user: User = Depends(get_curren
 | GET | `/api/pipelines/modules` | 列出所有已启用模块（含参数声明） | 已认证 |
 | GET | `/api/pipelines/modules/{name}` | 获取单个模块详情 | 已认证 |
 | POST | `/api/pipelines/run` | 提交处理任务 | 已认证 |
+| POST | `/api/pipelines/batch-run` | 批量提交处理任务（每个子集一个任务） | 已认证 |
 | PUT | `/api/pipelines/modules/{name}/enable` | 启用模块 | 管理员 |
 | PUT | `/api/pipelines/modules/{name}/disable` | 禁用模块 | 管理员 |
 | POST | `/api/pipelines/modules/{name}/load` | 手动加载模块 | 管理员 |
@@ -1026,3 +1028,140 @@ async def check_name_unique(
 | **Stage 6** | 任务调度：Scheduler、Task 模型、任务 API | Stage 5 |
 | **Stage 7** | WebSocket：ConnectionManager、任务状态实时推送 | Stage 6 |
 | **Stage 8** | 管理后台 API：用户管理、模块管理、全局样本库管理 | Stage 2 + Stage 5 |
+
+---
+
+## 10.2 · 样本集内部浏览器 V2 — API 详细设计
+
+样本集详情页从简单的子集列表升级为类文件浏览器风格。子集作为"目录"，图像作为"文件"，支持在根级（子集列表）和子集内（图像列表）之间切换，并将管线操作从独立面板移入右键菜单。
+
+### 10.2.1 设计变更概述
+
+| 变更项 | 旧设计 | 新设计 |
+| --- | --- | --- |
+| 样本集详情视图 | 扁平子集列表 + 独立管线建议面板 | 双视图（列表/网格）文件浏览器，仅单层（子集→图像） |
+| 图像上传 | 样本集级别自动创建 `raw` 子集 | 在子集内部上传，无自动创建 |
+| 管线感知UI | 顶部独立卡片 (primary / suggested / available) | 移入子集右键菜单（建议操作 + 更多操作子菜单） |
+| 管线运行 | 在对话框中选择输入子集 | 直接使用右键选中的子集作为输入 |
+| 批量运行 | 不支持 | 选中多个子集 → 右键 → 批量运行同一模块（每子集一个任务） |
+| 首选操作按钮 | 样本集顶部建议卡片的一键运行 | 样本集级别的操作按钮，选中首选模块的所有建议子集批量处理 |
+| 图像重命名 | 不支持 | 支持 PUT 重命名 |
+
+### 10.2.2 API 变更
+
+#### 新增：图像重命名
+
+| 方法 | 路径 | 说明 | 权限 |
+| --- | --- | --- | --- |
+| PUT | `/api/sample-sets/{set_id}/subsets/{subset_id}/images/{id}` | 更新图像信息（重命名） | 所有者 |
+
+**请求**：
+
+```json
+{
+  "filename": "new_name.nii.gz"
+}
+```
+
+**响应**：`200 OK`，返回更新后的 `ImageRead`。
+
+#### 新增：批量提交任务
+
+| 方法 | 路径 | 说明 | 权限 |
+| --- | --- | --- | --- |
+| POST | `/api/pipelines/batch-run` | 批量提交处理任务（每个子集一个任务） | 已认证 |
+
+**请求**：
+
+```json
+{
+  "module_name": "normalize",
+  "sample_set_id": "uuid",
+  "input_subset_ids": ["uuid-1", "uuid-2", "uuid-3"],
+  "output_subset_name_template": "{input_name}_{module}",
+  "params": {}
+}
+```
+
+- `input_subset_ids`：要批量处理的子集 ID 列表
+- `output_subset_name_template`：输出子集名称模板，支持 `{input_name}`（输入子集名称）和 `{module}`（模块名）占位符
+
+**响应**：`201 Created`
+
+```json
+{
+  "tasks": [
+    {
+      "id": "uuid",
+      "input_subset_id": "uuid-1",
+      "status": "queued",
+      ...
+    },
+    {
+      "id": "uuid",
+      "input_subset_id": "uuid-2",
+      "status": "queued",
+      ...
+    }
+  ],
+  "errors": []
+}
+```
+
+- `tasks`：成功创建的任务列表
+- `errors`：创建失败的条目（如输出名称冲突等），附带失败原因
+
+**行为**：
+- 为每个 `input_subset_id` 创建一个独立任务
+- 任务名称冲突处理：按模板展开后检查名称冲突，冲突的条目记入 `errors` 而非使整个请求失败
+- 所有成功任务独立入队调度
+
+#### 管线感知 API 保持不变
+
+现有 `GET /api/pipelines/awareness/{sample_set_id}` 返回的三级分层响应（`primary` / `suggested` / `available`）结构不变。前端根据右键的子集 ID 从响应中筛选对应的模块建议。
+
+### 10.2.3 Schema 变更
+
+新增 Schema：
+
+```python
+# app/schemas/sample.py — 新增
+
+class ImageUpdate(BaseModel):
+    filename: str | None = None
+
+
+# app/schemas/task.py — 新增
+
+class BatchTaskCreate(BaseModel):
+    module_name: str
+    sample_set_id: uuid.UUID
+    input_subset_ids: list[uuid.UUID]
+    output_subset_name_template: str = "{input_name}_{module}"
+    params: dict[str, Any] | None = None
+
+
+class BatchTaskResult(BaseModel):
+    tasks: list[TaskRead]
+    errors: list[BatchTaskError]
+
+
+class BatchTaskError(BaseModel):
+    input_subset_id: uuid.UUID
+    error_code: int
+    message: str
+```
+
+### 10.2.4 Service 层变更
+
+`app/services/task.py` 新增：
+
+| 函数 | 说明 |
+| --- | --- |
+| `submit_batch_tasks()` | 遍历 `input_subset_ids`，为每个子集调用 `submit_task()`，收集成功和失败结果 |
+
+`app/services/image.py` 新增：
+
+| 函数 | 说明 |
+| --- | --- |
+| `update_image()` | 更新图像元信息（当前仅支持重命名 `filename`） |

@@ -31,6 +31,17 @@ async def sample_set_id(client: AsyncClient, auth_headers: dict) -> str:
     return resp.json()["id"]
 
 
+@pytest.fixture
+async def subset_id(client: AsyncClient, auth_headers: dict, sample_set_id: str) -> str:
+    resp = await client.post(
+        f"/api/sample-sets/{sample_set_id}/subsets",
+        headers=auth_headers,
+        json={"name": "raw", "type": "raw"},
+    )
+    assert resp.status_code == 201
+    return resp.json()["id"]
+
+
 # --- SampleSet Tests ---
 
 
@@ -113,3 +124,77 @@ async def test_image_upload_and_download(
     )
     assert resp.status_code == 200
     assert resp.json() == []
+
+
+# --- Subset CRUD Tests ---
+
+
+@pytest.mark.asyncio
+async def test_create_subset(client: AsyncClient, auth_headers, sample_set_id):
+    resp = await client.post(
+        f"/api/sample-sets/{sample_set_id}/subsets",
+        headers=auth_headers,
+        json={"name": "my_subset", "type": "raw"},
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["name"] == "my_subset"
+    assert data["type"] == "raw"
+
+
+@pytest.mark.asyncio
+async def test_get_subset_detail(
+    client: AsyncClient, auth_headers, sample_set_id, subset_id
+):
+    resp = await client.get(
+        f"/api/sample-sets/{sample_set_id}/subsets/{subset_id}",
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["id"] == subset_id
+    assert data["name"] == "raw"
+    assert "images" in data
+
+
+# --- Image Upload/Rename/Delete Tests ---
+
+
+@pytest.mark.asyncio
+async def test_image_upload_and_rename(
+    client: AsyncClient, auth_headers, sample_set_id, subset_id
+):
+    # Upload an image
+    resp = await client.post(
+        f"/api/sample-sets/{sample_set_id}/subsets/{subset_id}/images",
+        headers=auth_headers,
+        files={"file": ("brain.nii.gz", b"fake-nifti-data", "application/octet-stream")},
+    )
+    assert resp.status_code == 201
+    image_id = resp.json()["id"]
+    assert resp.json()["filename"] == "brain.nii.gz"
+
+    # Rename the image
+    resp = await client.put(
+        f"/api/sample-sets/{sample_set_id}/subsets/{subset_id}/images/{image_id}",
+        headers=auth_headers,
+        json={"filename": "brain_v2.nii.gz"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["filename"] == "brain_v2.nii.gz"
+    assert resp.json()["id"] == image_id
+
+
+@pytest.mark.asyncio
+async def test_image_rename_not_found(
+    client: AsyncClient, auth_headers, sample_set_id, subset_id
+):
+    import uuid
+
+    fake_id = str(uuid.uuid4())
+    resp = await client.put(
+        f"/api/sample-sets/{sample_set_id}/subsets/{subset_id}/images/{fake_id}",
+        headers=auth_headers,
+        json={"filename": "new_name.nii.gz"},
+    )
+    assert resp.status_code == 404
