@@ -16,7 +16,7 @@ import {
   TooltipTrigger,
 } from "~/components/ui/tooltip";
 import { Separator } from "~/components/ui/separator";
-import { LibraryBreadcrumb } from "./library-breadcrumb";
+import { LibraryAddressBar } from "./library-breadcrumb";
 import { useLibraryStore } from "~/stores/library";
 
 interface LibraryToolbarProps {
@@ -111,10 +111,8 @@ export function LibraryToolbar({
 
         <Separator orientation="vertical" className="mx-1 h-5" />
 
-        {/* Breadcrumb */}
-        <div className="min-w-0 flex-1">
-          <LibraryBreadcrumb />
-        </div>
+        {/* Address bar */}
+        <LibraryAddressBar />
 
         <Separator orientation="vertical" className="mx-1 h-5" />
 

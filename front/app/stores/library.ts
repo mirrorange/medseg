@@ -44,6 +44,7 @@ interface LibraryState {
   selectRange: (id: string) => void;
   selectAll: () => void;
   clearSelection: () => void;
+  setSelection: (ids: string[]) => void;
 
   // Actions — View
   setViewMode: (mode: ViewMode) => void;
@@ -204,6 +205,8 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   },
 
   clearSelection: () => set({ selectedIds: [] }),
+
+  setSelection: (ids) => set({ selectedIds: ids }),
 
   // -- View ------------------------------------------------------
 

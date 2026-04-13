@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -15,8 +15,7 @@ import {
 import { CreateFolderDialog } from "./create-folder-dialog";
 import { CreateSampleSetDialog } from "./create-sample-set-dialog";
 import { RenameFolderDialog } from "./rename-folder-dialog";
-import { MoveDialog } from "./move-dialog";
-import {
+import { MoveDialog } from "./move-dialog";import { useLassoSelection, LassoOverlay } from "./use-lasso-selection";import {
   deleteApiLibraryFoldersFolderIdDelete,
   deleteApiSampleSetsSampleSetIdDelete,
   updateApiSampleSetsSampleSetIdPut,
@@ -61,6 +60,30 @@ export function LibraryBrowser() {
 
   // Context menu
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+
+  // Lasso selection
+  const lassoContainerRef = useRef<HTMLDivElement>(null);
+  const lassoState = useLassoSelection({
+    containerRef: lassoContainerRef,
+    itemSelector: "[data-library-item]",
+    getIdFromElement: (el) => el.getAttribute("data-item-id"),
+    onSelect: useCallback(
+      (ids: string[], additive: boolean) => {
+        if (additive) {
+          const merged = [...selectedIds];
+          const set = new globalThis.Set(selectedIds);
+          for (const id of ids) {
+            if (!set.has(id)) merged.push(id);
+          }
+          useLibraryStore.getState().setSelection(merged);
+        } else {
+          useLibraryStore.getState().setSelection(ids);
+        }
+      },
+      [selectedIds],
+    ),
+    enabled: !isLoading,
+  });
 
   // Load contents on mount
   useEffect(() => {
@@ -119,7 +142,7 @@ export function LibraryBrowser() {
   // Handle context menu on empty area
   const handleEmptyContextMenu = useCallback((e: React.MouseEvent) => {
     // Only trigger for background clicks, not item clicks
-    if ((e.target as HTMLElement).closest("[data-selected]")) return;
+    if ((e.target as HTMLElement).closest("[data-library-item]")) return;
     e.preventDefault();
     clearSelection();
     setContextMenu({ x: e.clientX, y: e.clientY, item: null });
@@ -248,6 +271,7 @@ export function LibraryBrowser() {
 
       {/* Main content area */}
       <div
+        ref={lassoContainerRef}
         className="relative flex-1"
         onContextMenu={handleEmptyContextMenu}
         onClick={() => {
@@ -255,6 +279,7 @@ export function LibraryBrowser() {
           setContextMenu(null);
         }}
       >
+        <LassoOverlay rect={lassoState.rect} />
         {isLoading && items.length === 0 ? (
           <div className="flex h-full items-center justify-center">
             <Loader2 className="text-muted-foreground size-8 animate-spin" />

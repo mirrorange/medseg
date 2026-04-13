@@ -81,6 +81,8 @@ export function LibraryGridView({
         return (
           <div
             key={item.id}
+            data-library-item
+            data-item-id={item.id}
             data-selected={isSelected || undefined}
             draggable
             className={cn(
