@@ -199,7 +199,7 @@ export default function SampleSetDetailPage({
   }, []);
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       <SampleSetBrowser
         sampleSetId={sampleSet.id}
         sampleSetName={sampleSet.name}
