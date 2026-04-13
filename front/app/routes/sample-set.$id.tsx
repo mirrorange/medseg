@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { redirect } from "react-router";
 import type { Route } from "./+types/sample-set.$id";
 import { toast } from "sonner";
@@ -18,6 +18,7 @@ import { PropertiesDialog } from "~/features/sample-set/properties-dialog";
 import { ImageUploadDialog } from "~/features/sample-set/image-upload-dialog";
 import { ConfirmDialog } from "~/components/confirm-dialog";
 import { useSampleSetStore } from "~/stores/sample-set";
+import { useTaskStore } from "~/stores/task";
 
 export function meta({ data }: Route.MetaArgs) {
   return [{ title: `${data?.sampleSet?.name ?? "Sample Set"} - MedSeg Cloud` }];
@@ -35,6 +36,8 @@ export default function SampleSetDetailPage({
   loaderData,
 }: Route.ComponentProps) {
   const { sampleSet } = loaderData;
+  const tasks = useTaskStore((s) => s.tasks);
+  const taskStatusesRef = useRef<Record<string, string>>({});
 
   // Delete sample set
   const [deleteSSOpen, setDeleteSSOpen] = useState(false);
@@ -138,6 +141,18 @@ export default function SampleSetDetailPage({
           toast.error("Failed to submit pipeline tasks");
           return;
         }
+
+        useTaskStore.getState().upsertTasks(
+          (data?.tasks ?? []).map((task) => ({
+            id: task.id,
+            status: task.status,
+            module_name: task.module_name,
+            sample_set_id: task.sample_set_id,
+            queue_position: null,
+            estimated_wait_ms: null,
+          })),
+        );
+
         const taskCount = data?.tasks?.length ?? 0;
         const errorCount = data?.errors?.length ?? 0;
         if (errorCount > 0) {
@@ -197,6 +212,30 @@ export default function SampleSetDetailPage({
   const storeRefresh = useCallback(() => {
     void useSampleSetStore.getState().refresh();
   }, []);
+
+  useEffect(() => {
+    const nextStatuses: Record<string, string> = {};
+    let shouldRefresh = false;
+
+    for (const task of tasks) {
+      if (task.sample_set_id !== sampleSet.id) {
+        continue;
+      }
+
+      nextStatuses[task.id] = task.status;
+
+      const previousStatus = taskStatusesRef.current[task.id];
+      if (previousStatus && previousStatus !== "completed" && task.status === "completed") {
+        shouldRefresh = true;
+      }
+    }
+
+    taskStatusesRef.current = nextStatuses;
+
+    if (shouldRefresh) {
+      void useSampleSetStore.getState().refresh();
+    }
+  }, [tasks, sampleSet.id]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
