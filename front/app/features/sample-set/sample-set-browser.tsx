@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router";
 import { Loader2 } from "lucide-react";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { useSampleSetStore, useCurrentItems } from "~/stores/sample-set";
@@ -55,6 +56,7 @@ export function SampleSetBrowser({
   } = useSampleSetStore();
 
   const items = useCurrentItems();
+  const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
@@ -108,15 +110,18 @@ export function SampleSetBrowser({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectAll, clearSelection]);
 
-  // Double-click on a subset → navigate into it
+  // Double-click on a subset → navigate into it; on an image → open viewer
   const handleOpen = useCallback(
     (item: SubsetRead | ImageRead) => {
       if (level === "subsets") {
         void openSubset(item.id);
+      } else {
+        // Navigate to viewer with imageId
+        const store = useSampleSetStore.getState();
+        navigate(`/app/viewer/${store.sampleSetId}/${store.currentSubsetId}?imageId=${item.id}`);
       }
-      // For images: could open viewer in future
     },
-    [level, openSubset],
+    [level, openSubset, navigate],
   );
 
   // Context menu on item
@@ -156,6 +161,15 @@ export function SampleSetBrowser({
         case "open":
           if (firstSelected && level === "subsets") void openSubset(firstSelected.id);
           break;
+        case "preview": {
+          const store = useSampleSetStore.getState();
+          if (level === "subsets" && firstSelected) {
+            navigate(`/app/viewer/${store.sampleSetId}/${firstSelected.id}`);
+          } else if (level === "images" && firstSelected && store.currentSubsetId) {
+            navigate(`/app/viewer/${store.sampleSetId}/${store.currentSubsetId}?imageId=${firstSelected.id}`);
+          }
+          break;
+        }
         case "rename":
           if (firstSelected) onRename(firstSelected);
           break;
@@ -179,7 +193,7 @@ export function SampleSetBrowser({
           break;
       }
     },
-    [items, selectedIds, level, openSubset, onRename, onDeleteSelected, onProperties, onCreateSubset, onUploadImages, selectAll, refresh, onRunPipeline],
+    [items, selectedIds, level, openSubset, navigate, onRename, onDeleteSelected, onProperties, onCreateSubset, onUploadImages, selectAll, refresh, onRunPipeline],
   );
 
   return (

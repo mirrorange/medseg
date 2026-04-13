@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { redirect, useNavigate } from "react-router";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { redirect, useNavigate, useSearchParams } from "react-router";
 import { ArrowLeft } from "lucide-react";
 import type { Route } from "./+types/viewer.$setId.$subsetId";
 import { Button } from "~/components/ui/button";
@@ -11,7 +11,6 @@ import type { ImageRead, SubsetDetail } from "~/api/types.gen";
 import { useAuthStore } from "~/stores/auth";
 
 // Lazy imports — Cornerstone modules are heavy
-let cornerstoneInitialized = false;
 
 export function meta({ data }: Route.MetaArgs) {
   return [
@@ -41,16 +40,27 @@ export async function clientLoader({ params }: Route.ClientLoaderArgs) {
 export default function ViewerPage({ loaderData }: Route.ComponentProps) {
   const { subset, setId, subsetId } = loaderData;
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const token = useAuthStore((s) => s.token);
 
+  const [images, setImages] = useState<ImageRead[]>([]);
+  const [currentImageId, setCurrentImageId] = useState<string | null>(
+    searchParams.get("imageId"),
+  );
   const [volumeId, setVolumeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Track loaded volume IDs for cleanup
+  const loadedVolumesRef = useRef<string[]>([]);
 
   // Dynamically import heavy modules
   const [ViewerComponents, setViewerComponents] = useState<{
     MprViewer: typeof import("~/features/viewer/mpr-viewer").MprViewer;
     ViewerToolbar: typeof import("~/features/viewer/viewer-toolbar").ViewerToolbar;
+    ImageNavigator: typeof import("~/features/viewer/image-navigator").ImageNavigator;
+    addSegmentationOverlay: typeof import("~/features/viewer/segmentation-overlay").addSegmentationOverlay;
+    removeSegmentationOverlay: typeof import("~/features/viewer/segmentation-overlay").removeSegmentationOverlay;
   } | null>(null);
 
   useEffect(() => {
@@ -60,18 +70,26 @@ export default function ViewerPage({ loaderData }: Route.ComponentProps) {
         { initCornerstone },
         { MprViewer },
         { ViewerToolbar },
+        { ImageNavigator },
+        { addSegmentationOverlay, removeSegmentationOverlay },
       ] = await Promise.all([
         import("~/features/viewer/cornerstone-init"),
         import("~/features/viewer/mpr-viewer"),
         import("~/features/viewer/viewer-toolbar"),
+        import("~/features/viewer/image-navigator"),
+        import("~/features/viewer/segmentation-overlay"),
       ]);
 
       if (cancelled) return;
 
       await initCornerstone();
-      cornerstoneInitialized = true;
-
-      setViewerComponents({ MprViewer, ViewerToolbar });
+      setViewerComponents({
+        MprViewer,
+        ViewerToolbar,
+        ImageNavigator,
+        addSegmentationOverlay,
+        removeSegmentationOverlay,
+      });
     })();
 
     return () => {
@@ -79,39 +97,94 @@ export default function ViewerPage({ loaderData }: Route.ComponentProps) {
     };
   }, []);
 
-  // Load the first image from the subset as a volume
+  // Fetch images list for this subset
   useEffect(() => {
-    if (!ViewerComponents) return;
     let cancelled = false;
+    (async () => {
+      const { data } =
+        await listAllApiSampleSetsSampleSetIdSubsetsSubsetIdImagesGet({
+          path: { sample_set_id: setId, subset_id: subsetId },
+        });
+      if (cancelled) return;
+
+      const list = data ?? [];
+      setImages(list);
+
+      // If no imageId in URL, default to first image
+      if (!currentImageId && list.length > 0) {
+        setCurrentImageId(list[0].id);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [setId, subsetId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load the current image as a volume whenever it changes
+  useEffect(() => {
+    if (!ViewerComponents || !currentImageId || images.length === 0) return;
+
+    const image = images.find((img) => img.id === currentImageId);
+    if (!image) return;
+
+    let cancelled = false;
+    const { addSegmentationOverlay, removeSegmentationOverlay } = ViewerComponents;
 
     (async () => {
       setLoading(true);
       setError(null);
 
-      // Fetch images in this subset
-      const { data: images } =
-        await listAllApiSampleSetsSampleSetIdSubsetsSubsetIdImagesGet({
-          path: { sample_set_id: setId, subset_id: subsetId },
-        });
-
-      if (cancelled) return;
-
-      if (!images || images.length === 0) {
-        setError("No images in this subset");
-        setLoading(false);
-        return;
+      // Clean up previous segmentation overlay
+      try {
+        removeSegmentationOverlay("seg_overlay");
+      } catch {
+        // ignore
       }
 
       try {
-        const image = images[0];
         const vid = await loadImageAsVolume(image, setId, subsetId, token!);
-        if (!cancelled) {
-          setVolumeId(vid);
+        if (cancelled) return;
+
+        loadedVolumesRef.current.push(vid);
+        setVolumeId(vid);
+
+        // Check if this is a segmentation subset — load source overlay
+        const isSegmentation = subset.metadata_?.is_segmentation === true;
+        const sourceSubsetId = subset.source_subset_id;
+
+        if (isSegmentation && sourceSubsetId && image.source_image_id) {
+          try {
+            // Load the corresponding source image
+            const sourceImage: ImageRead = {
+              id: image.source_image_id,
+              filename: "",
+              format: image.format,
+              subset_id: sourceSubsetId,
+              storage_path: "",
+              source_image_id: null,
+              metadata_: {},
+              created_at: "",
+            };
+            const sourceVid = await loadImageAsVolume(
+              sourceImage,
+              setId,
+              sourceSubsetId,
+              token!,
+            );
+            if (!cancelled) {
+              loadedVolumesRef.current.push(sourceVid);
+              // Swap: show source as base, segmentation as overlay
+              setVolumeId(sourceVid);
+              await addSegmentationOverlay(sourceVid, vid, "seg_overlay");
+            }
+          } catch {
+            // If source fails, still show the segmentation volume alone
+          }
         }
       } catch (err) {
         if (!cancelled) {
           setError(
-            err instanceof Error ? err.message : "Failed to load image"
+            err instanceof Error ? err.message : "Failed to load image",
           );
         }
       } finally {
@@ -122,7 +195,16 @@ export default function ViewerPage({ loaderData }: Route.ComponentProps) {
     return () => {
       cancelled = true;
     };
-  }, [ViewerComponents, setId, subsetId, token]);
+  }, [ViewerComponents, currentImageId, images, setId, subsetId, subset, token]);
+
+  // Handle image selection from navigator
+  const handleSelectImage = useCallback(
+    (imageId: string) => {
+      setCurrentImageId(imageId);
+      setSearchParams({ imageId }, { replace: true });
+    },
+    [setSearchParams],
+  );
 
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col">
@@ -141,20 +223,31 @@ export default function ViewerPage({ loaderData }: Route.ComponentProps) {
         {ViewerComponents && <ViewerComponents.ViewerToolbar />}
       </div>
 
-      {/* Viewer area */}
-      <div className="flex-1">
-        {loading && (
-          <div className="flex h-full items-center justify-center text-muted-foreground">
-            Loading volume...
-          </div>
-        )}
-        {error && (
-          <div className="flex h-full items-center justify-center text-destructive">
-            {error}
-          </div>
-        )}
-        {!loading && !error && ViewerComponents && (
-          <ViewerComponents.MprViewer volumeId={volumeId} />
+      {/* Viewer area + image navigator */}
+      <div className="flex flex-1 min-h-0">
+        <div className="flex-1">
+          {loading && (
+            <div className="flex h-full items-center justify-center text-muted-foreground">
+              Loading volume...
+            </div>
+          )}
+          {error && (
+            <div className="flex h-full items-center justify-center text-destructive">
+              {error}
+            </div>
+          )}
+          {!loading && !error && ViewerComponents && (
+            <ViewerComponents.MprViewer volumeId={volumeId} />
+          )}
+        </div>
+
+        {/* Side panel: image navigator */}
+        {ViewerComponents && images.length > 0 && (
+          <ViewerComponents.ImageNavigator
+            images={images}
+            currentImageId={currentImageId}
+            onSelect={handleSelectImage}
+          />
         )}
       </div>
     </div>

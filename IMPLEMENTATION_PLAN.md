@@ -51,7 +51,7 @@
 - 名称编辑后调用 API 更新
 - 分享按钮根据 is_shared 正确显示状态
 - 首选操作按钮弹出 RunPipelineDialog
-**Status**: Not Started
+**Status**: Complete
 
 ## Stage 4: 前端 — 预览入口 & 查看器图像导航
 **Goal**: 添加所有预览入口，查看器支持子集内图像切换

@@ -1,13 +1,13 @@
 import { useRef, useEffect, useCallback } from "react";
 import {
   FolderOpen, Edit, Trash2, FolderPlus, Upload, ListChecks, RefreshCw,
-  Play, ChevronRight, Info,
+  Play, ChevronRight, Info, Eye,
 } from "lucide-react";
 import type { SubsetRead, ImageRead, AwarenessResponse, ModuleAwarenessItem } from "~/api/types.gen";
 import type { BrowseLevel } from "~/stores/sample-set";
 
 export type SampleSetAction =
-  | "open" | "rename" | "delete"
+  | "open" | "rename" | "delete" | "preview"
   | "new-subset" | "upload-images"
   | "select-all" | "refresh" | "properties"
   | { type: "run-pipeline"; module: ModuleAwarenessItem };
@@ -70,6 +70,7 @@ export function SampleSetContextMenu({
           {level === "subsets" && (
             <MenuItem icon={<FolderOpen className="size-4" />} label="Open" onClick={() => fire("open")} />
           )}
+          <MenuItem icon={<Eye className="size-4" />} label="Preview" onClick={() => fire("preview")} />
           <MenuItem icon={<Edit className="size-4" />} label="Rename" onClick={() => fire("rename")} />
           <MenuItem
             icon={<Trash2 className="size-4" />}
