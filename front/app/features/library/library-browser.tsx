@@ -54,7 +54,7 @@ export function LibraryBrowser() {
     name: string;
   } | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<LibraryItem | null>(null);
+  const [deleteTargets, setDeleteTargets] = useState<LibraryItem[]>([]);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
 
@@ -177,8 +177,11 @@ export function LibraryBrowser() {
           break;
 
         case "delete":
-          if (firstSelected) {
-            setDeleteTarget(firstSelected);
+          if (selectedIds.length > 0) {
+            setDeleteTargets(items.filter((item) => selectedIds.includes(item.id)));
+            setDeleteOpen(true);
+          } else if (firstSelected) {
+            setDeleteTargets([firstSelected]);
             setDeleteOpen(true);
           }
           break;
@@ -205,29 +208,44 @@ export function LibraryBrowser() {
 
   // Handle delete
   const handleDelete = useCallback(async () => {
-    if (!deleteTarget) return;
+    if (deleteTargets.length === 0) return;
+
     setDeleteLoading(true);
+
     try {
-      if (deleteTarget.type === "folder") {
-        await deleteApiLibraryFoldersFolderIdDelete({
-          path: { folder_id: deleteTarget.id },
-          query: { recursive: true },
-        });
-      } else {
-        await deleteApiSampleSetsSampleSetIdDelete({
-          path: { sample_set_id: deleteTarget.id },
-        });
+      let deletedCount = 0;
+
+      for (const target of deleteTargets) {
+        if (target.type === "folder") {
+          await deleteApiLibraryFoldersFolderIdDelete({
+            path: { folder_id: target.id },
+            query: { recursive: true },
+          });
+        } else {
+          await deleteApiSampleSetsSampleSetIdDelete({
+            path: { sample_set_id: target.id },
+          });
+        }
+
+        deletedCount += 1;
       }
-      toast.success(`Deleted "${deleteTarget.name}"`);
+
+      toast.success(
+        deletedCount === 1
+          ? `Deleted "${deleteTargets[0].name}"`
+          : `Deleted ${deletedCount} items`,
+      );
+
       setDeleteOpen(false);
-      setDeleteTarget(null);
+      setDeleteTargets([]);
+      useLibraryStore.getState().clearSelection();
       void refresh();
     } catch {
-      toast.error("Failed to delete item");
+      toast.error(deleteTargets.length > 1 ? "Failed to delete selected items" : "Failed to delete item");
     } finally {
       setDeleteLoading(false);
     }
-  }, [deleteTarget, refresh]);
+  }, [deleteTargets, refresh]);
 
   // Handle sample set rename
   const handleRenameSS = useCallback(async () => {
@@ -381,9 +399,16 @@ export function LibraryBrowser() {
 
       <ConfirmDialog
         open={deleteOpen}
-        onOpenChange={setDeleteOpen}
+        onOpenChange={(open) => {
+          setDeleteOpen(open);
+          if (!open) {
+            setDeleteTargets([]);
+          }
+        }}
         title="Delete"
-        description={`Are you sure you want to delete "${deleteTarget?.name}"? This action cannot be undone.`}
+        description={deleteTargets.length > 1
+          ? `Are you sure you want to delete ${deleteTargets.length} items? This action cannot be undone.`
+          : `Are you sure you want to delete "${deleteTargets[0]?.name}"? This action cannot be undone.`}
         loading={deleteLoading}
         onConfirm={handleDelete}
         destructive
