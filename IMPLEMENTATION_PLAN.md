@@ -38,7 +38,7 @@
 - 对话框能正确显示模块参数表单
 - 默认名称生成正确（{input_name}_{module_name}）
 - 冲突检测能识别已有子集名称
-**Status**: Not Started
+**Status**: Complete
 
 ## Stage 3: 前端 — SampleSetHeader 顶部信息区
 **Goal**: 样本集详情页顶部显示名称/描述/首选操作/分享

@@ -8,7 +8,6 @@ import {
   deleteApiSampleSetsSampleSetIdSubsetsSubsetIdDelete,
   deleteApiSampleSetsSampleSetIdSubsetsSubsetIdImagesImageIdDelete,
   publishSharedApiLibrarySharedSampleSetIdPost,
-  batchRunPipelineApiPipelinesBatchRunPost,
 } from "~/api";
 import type { SubsetRead, ImageRead, ModuleAwarenessItem } from "~/api/types.gen";
 import { SampleSetBrowser } from "~/features/sample-set/sample-set-browser";
@@ -16,6 +15,7 @@ import { CreateSubsetDialog } from "~/features/sample-set/create-subset-dialog";
 import { RenameDialog } from "~/features/sample-set/rename-dialog";
 import { PropertiesDialog } from "~/features/sample-set/properties-dialog";
 import { ImageUploadDialog } from "~/features/sample-set/image-upload-dialog";
+import { RunPipelineDialog } from "~/features/sample-set/run-pipeline-dialog";
 import { ConfirmDialog } from "~/components/confirm-dialog";
 import { useSampleSetStore } from "~/stores/sample-set";
 import { useTaskStore } from "~/stores/task";
@@ -126,45 +126,25 @@ export default function SampleSetDetailPage({
     void store.refresh();
   }
 
-  // Run pipeline on specific subsets (from context menu)
+  // Run pipeline dialog state
+  const [pipelineOpen, setPipelineOpen] = useState(false);
+  const [pipelineModule, setPipelineModule] = useState<ModuleAwarenessItem | null>(null);
+  const [pipelineSubsetIds, setPipelineSubsetIds] = useState<string[]>([]);
+
+  // Run pipeline on specific subsets (from context menu or primary action)
   const handleRunPipeline = useCallback(
     (module: ModuleAwarenessItem, subsetIds: string[]) => {
-      const store = useSampleSetStore.getState();
-      batchRunPipelineApiPipelinesBatchRunPost({
-        body: {
-          module_name: module.module_name,
-          sample_set_id: sampleSet.id,
-          input_subset_ids: subsetIds,
-        },
-      }).then(({ data, error: apiError }) => {
-        if (apiError) {
-          toast.error("Failed to submit pipeline tasks");
-          return;
-        }
-
-        useTaskStore.getState().upsertTasks(
-          (data?.tasks ?? []).map((task) => ({
-            id: task.id,
-            status: task.status,
-            module_name: task.module_name,
-            sample_set_id: task.sample_set_id,
-            queue_position: null,
-            estimated_wait_ms: null,
-          })),
-        );
-
-        const taskCount = data?.tasks?.length ?? 0;
-        const errorCount = data?.errors?.length ?? 0;
-        if (errorCount > 0) {
-          toast.warning(`Submitted ${taskCount} task(s), ${errorCount} failed`);
-        } else {
-          toast.success(`Submitted ${taskCount} task(s) for ${module.module_name}`);
-        }
-        void store.refresh();
-      });
+      setPipelineModule(module);
+      setPipelineSubsetIds(subsetIds);
+      setPipelineOpen(true);
     },
-    [sampleSet.id],
+    [],
   );
+
+  const handlePipelineSubmitted = useCallback(() => {
+    toast.success("Pipeline task(s) submitted");
+    void useSampleSetStore.getState().refresh();
+  }, []);
 
   // Primary action button
   const handlePrimaryAction = useCallback(() => {
@@ -303,6 +283,17 @@ export default function SampleSetDetailPage({
           sampleSetId={sampleSet.id}
           subsetId={currentSubsetId}
           onUploaded={storeRefresh}
+        />
+      )}
+      {pipelineModule && (
+        <RunPipelineDialog
+          open={pipelineOpen}
+          onOpenChange={setPipelineOpen}
+          sampleSetId={sampleSet.id}
+          module={pipelineModule}
+          inputSubsetIds={pipelineSubsetIds}
+          subsets={sampleSet.subsets ?? []}
+          onSubmitted={handlePipelineSubmitted}
         />
       )}
     </div>

@@ -95,6 +95,10 @@ export type BatchTaskCreate = {
     params?: {
         [key: string]: unknown;
     } | null;
+    /**
+     * Overwrite
+     */
+    overwrite?: boolean;
 };
 
 /**
@@ -523,6 +527,10 @@ export type SampleSetDetail = {
      * Subsets
      */
     subsets?: Array<SubsetRead>;
+    /**
+     * Is Shared
+     */
+    is_shared?: boolean;
 };
 
 /**
@@ -745,6 +753,10 @@ export type TaskCreate = {
     params?: {
         [key: string]: unknown;
     } | null;
+    /**
+     * Overwrite
+     */
+    overwrite?: boolean;
 };
 
 /**
@@ -781,6 +793,10 @@ export type TaskRead = {
     params: {
         [key: string]: unknown;
     } | null;
+    /**
+     * Overwrite
+     */
+    overwrite: boolean;
     status: TaskStatus;
     /**
      * Error Message
