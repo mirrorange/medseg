@@ -275,6 +275,8 @@ export function LibraryBrowser() {
         className="relative flex-1"
         onContextMenu={handleEmptyContextMenu}
         onClick={() => {
+          // Don't clear selection if a lasso selection just completed
+          if (lassoState.justFinished) return;
           clearSelection();
           setContextMenu(null);
         }}

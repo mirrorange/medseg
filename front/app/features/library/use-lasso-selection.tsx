@@ -10,6 +10,8 @@ interface Rect {
 interface LassoState {
   active: boolean;
   rect: Rect | null;
+  /** True briefly after a lasso selection completes (to prevent click from clearing) */
+  justFinished: boolean;
 }
 
 interface UseLassoSelectionOptions {
@@ -27,7 +29,7 @@ export function useLassoSelection({
   onSelect,
   enabled = true,
 }: UseLassoSelectionOptions): LassoState {
-  const [state, setState] = useState<LassoState>({ active: false, rect: null });
+  const [state, setState] = useState<LassoState>({ active: false, rect: null, justFinished: false });
   const startPoint = useRef<{ x: number; y: number } | null>(null);
   const additiveRef = useRef(false);
   const activeRef = useRef(false);
@@ -79,7 +81,7 @@ export function useLassoSelection({
         height: Math.abs(dy),
       };
 
-      setState({ active: true, rect });
+      setState({ active: true, rect, justFinished: false });
 
       const container = containerRef.current;
       if (!container) return;
@@ -102,9 +104,18 @@ export function useLassoSelection({
 
   const handleMouseUp = useCallback(() => {
     if (startPoint.current) {
+      const wasActive = activeRef.current;
       startPoint.current = null;
       activeRef.current = false;
-      setState({ active: false, rect: null });
+      if (wasActive) {
+        // Briefly set justFinished to prevent the subsequent click from clearing selection
+        setState({ active: false, rect: null, justFinished: true });
+        requestAnimationFrame(() => {
+          setState((s) => ({ ...s, justFinished: false }));
+        });
+      } else {
+        setState({ active: false, rect: null, justFinished: false });
+      }
     }
   }, []);
 

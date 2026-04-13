@@ -6,27 +6,63 @@ import { cn } from "~/lib/utils";
 /**
  * Dual-mode address bar (inspired by XDeck / Windows Explorer):
  * - Display mode: clickable path segments, click empty area to enter edit mode
- * - Edit mode: text input showing the path, Enter to submit / Escape to cancel
+ * - Edit mode: text input showing the path, Enter to navigate / Escape to cancel
  */
 export function LibraryAddressBar() {
-  const { breadcrumb, navigateTo, isLoading } = useLibraryStore();
+  const { breadcrumb, items, navigateTo, isLoading } = useLibraryStore();
   const [editing, setEditing] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Build display path from breadcrumb
+  // Build display path from breadcrumb (with "/" separator, no spaces)
   const pathText =
     breadcrumb.length === 0
       ? "Library"
-      : "Library / " + breadcrumb.map((c) => c.name).join(" / ");
+      : "Library/" + breadcrumb.map((c) => c.name).join("/");
 
   const enterEdit = () => {
     setInputValue(pathText);
     setEditing(true);
   };
 
-  const exitEdit = () => {
+  const handleSubmit = () => {
     setEditing(false);
+    const trimmed = inputValue.trim();
+    if (!trimmed || trimmed === pathText) return;
+
+    // Parse the typed path and try to navigate
+    // Strip leading "Library/" or "Library" prefix
+    let relative = trimmed;
+    if (relative.toLowerCase().startsWith("library/")) {
+      relative = relative.slice("library/".length);
+    } else if (relative.toLowerCase() === "library") {
+      void navigateTo(null);
+      return;
+    }
+
+    // Split into segments and try to resolve by matching folder names
+    // Start from the current breadcrumb and look for direct child matches
+    const segments = relative.split("/").filter(Boolean);
+    if (segments.length === 0) {
+      void navigateTo(null);
+      return;
+    }
+
+    // Try to find a matching folder among current items for the first segment
+    // This is a best-effort approach since we can't do path-based resolution
+    const firstSegment = segments[0].toLowerCase();
+    const matchingFolder = items.find(
+      (i) => i.type === "folder" && i.name.toLowerCase() === firstSegment,
+    );
+    if (matchingFolder) {
+      void navigateTo(matchingFolder.id);
+    }
+    // If no match found, just stay where we are
+  };
+
+  const handleCancel = () => {
+    setEditing(false);
+    setInputValue(pathText);
   };
 
   // Auto-focus input when entering edit mode
@@ -44,10 +80,16 @@ export function LibraryAddressBar() {
         className="h-7 flex-1 font-mono text-sm"
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}
-        onBlur={exitEdit}
+        onBlur={handleSubmit}
         onKeyDown={(e) => {
-          if (e.key === "Enter") exitEdit();
-          if (e.key === "Escape") exitEdit();
+          if (e.key === "Enter") {
+            e.preventDefault();
+            handleSubmit();
+          }
+          if (e.key === "Escape") {
+            e.preventDefault();
+            handleCancel();
+          }
         }}
       />
     );
