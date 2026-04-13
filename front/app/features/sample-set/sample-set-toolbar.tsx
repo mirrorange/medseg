@@ -7,6 +7,7 @@ import {
   RefreshCw,
   Trash2,
   Share2,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import {
@@ -17,23 +18,28 @@ import {
 } from "~/components/ui/tooltip";
 import { Separator } from "~/components/ui/separator";
 import { useSampleSetStore, useCurrentSubsetName } from "~/stores/sample-set";
+import type { AwarenessResponse } from "~/api/types.gen";
 
 interface SampleSetToolbarProps {
   sampleSetName: string;
+  awareness: AwarenessResponse | null;
   onCreateSubset: () => void;
   onUploadImages: () => void;
   onDeleteSelected: () => void;
   onShare: () => void;
   onDeleteSampleSet: () => void;
+  onPrimaryAction: () => void;
 }
 
 export function SampleSetToolbar({
   sampleSetName,
+  awareness,
   onCreateSubset,
   onUploadImages,
   onDeleteSelected,
   onShare,
   onDeleteSampleSet,
+  onPrimaryAction,
 }: SampleSetToolbarProps) {
   const { level, isLoading, viewMode, setViewMode, goBack, refresh, selectedIds } =
     useSampleSetStore();
@@ -99,6 +105,25 @@ export function SampleSetToolbar({
         {/* Context-sensitive actions */}
         {level === "subsets" && (
           <>
+            {awareness?.primary && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="h-7 gap-1 px-2 text-xs"
+                    onClick={onPrimaryAction}
+                  >
+                    <Sparkles className="size-3.5" />
+                    {awareness.primary.module_name}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  Run {awareness.primary.module_name} on {awareness.primary.recommended_subset_ids.length} recommended subset(s)
+                </TooltipContent>
+              </Tooltip>
+            )}
+
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon" className="size-7" onClick={onCreateSubset}>

@@ -8,8 +8,9 @@ import {
   deleteApiSampleSetsSampleSetIdSubsetsSubsetIdDelete,
   deleteApiSampleSetsSampleSetIdSubsetsSubsetIdImagesImageIdDelete,
   publishSharedApiLibrarySharedSampleSetIdPost,
+  batchRunPipelineApiPipelinesBatchRunPost,
 } from "~/api";
-import type { SubsetRead, ImageRead } from "~/api/types.gen";
+import type { SubsetRead, ImageRead, ModuleAwarenessItem } from "~/api/types.gen";
 import { SampleSetBrowser } from "~/features/sample-set/sample-set-browser";
 import { ConfirmDialog } from "~/components/confirm-dialog";
 import { useSampleSetStore } from "~/stores/sample-set";
@@ -39,14 +40,6 @@ export default function SampleSetDetailPage({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteDescription, setDeleteDescription] = useState("");
-
-  // Context menu (placeholder for Stage 5)
-  const handleContextMenu = useCallback(
-    (_e: React.MouseEvent, _item: SubsetRead | ImageRead | null) => {
-      // Will be implemented in Stage 5
-    },
-    [],
-  );
 
   // Share
   const handleShare = useCallback(() => {
@@ -107,15 +100,57 @@ export default function SampleSetDetailPage({
     void store.refresh();
   }
 
+  // Run pipeline on specific subsets (from context menu)
+  const handleRunPipeline = useCallback(
+    (module: ModuleAwarenessItem, subsetIds: string[]) => {
+      const store = useSampleSetStore.getState();
+      batchRunPipelineApiPipelinesBatchRunPost({
+        body: {
+          module_name: module.module_name,
+          sample_set_id: sampleSet.id,
+          input_subset_ids: subsetIds,
+        },
+      }).then(({ data, error: apiError }) => {
+        if (apiError) {
+          toast.error("Failed to submit pipeline tasks");
+          return;
+        }
+        const taskCount = data?.tasks?.length ?? 0;
+        const errorCount = data?.errors?.length ?? 0;
+        if (errorCount > 0) {
+          toast.warning(`Submitted ${taskCount} task(s), ${errorCount} failed`);
+        } else {
+          toast.success(`Submitted ${taskCount} task(s) for ${module.module_name}`);
+        }
+        void store.refresh();
+      });
+    },
+    [sampleSet.id],
+  );
+
+  // Primary action button: run primary module on all its recommended subsets
+  const handlePrimaryAction = useCallback(() => {
+    const store = useSampleSetStore.getState();
+    const primary = store.awareness?.primary;
+    if (!primary) return;
+    handleRunPipeline(primary, primary.recommended_subset_ids);
+  }, [handleRunPipeline]);
+
   // Placeholder callbacks for Stage 6
   const handleCreateSubset = useCallback(() => {
-    // Will be implemented in Stage 6
     toast.info("Create subset dialog coming in Stage 6");
   }, []);
 
   const handleUploadImages = useCallback(() => {
-    // Will be implemented in Stage 6
     toast.info("Upload dialog coming in Stage 6");
+  }, []);
+
+  const handleRename = useCallback((_item: SubsetRead | ImageRead) => {
+    toast.info("Rename dialog coming in Stage 6");
+  }, []);
+
+  const handleProperties = useCallback((_item: SubsetRead | ImageRead) => {
+    toast.info("Properties dialog coming in Stage 6");
   }, []);
 
   return (
@@ -128,7 +163,10 @@ export default function SampleSetDetailPage({
         onDeleteSelected={handleDeleteSelected}
         onShare={handleShare}
         onDeleteSampleSet={() => setDeleteSSOpen(true)}
-        onContextMenu={handleContextMenu}
+        onRename={handleRename}
+        onProperties={handleProperties}
+        onRunPipeline={handleRunPipeline}
+        onPrimaryAction={handlePrimaryAction}
       />
 
       {/* Dialogs */}
