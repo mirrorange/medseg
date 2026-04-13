@@ -29,6 +29,10 @@ class SampleSetRead(BaseModel):
     updated_at: datetime
 
 
+class AdminSampleSetRead(SampleSetRead):
+    owner_username: str
+
+
 class SampleSetDetail(SampleSetRead):
     subsets: list["SubsetRead"] = []
     is_shared: bool = False

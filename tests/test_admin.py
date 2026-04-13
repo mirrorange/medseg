@@ -192,3 +192,79 @@ async def test_non_admin_cannot_create_user(client, regular_header):
         headers=regular_header,
     )
     assert resp.status_code == 403
+
+
+# --------------- Admin Sample Set Search & Owner Username ---------------
+
+
+@pytest.mark.asyncio
+async def test_admin_sample_sets_include_owner_username(
+    client, admin_header, regular_header
+):
+    """Response should include owner_username instead of just owner_id."""
+    await client.post(
+        "/api/sample-sets",
+        json={"name": "Owner Test Set"},
+        headers=regular_header,
+    )
+    resp = await client.get("/api/admin/sample-sets", headers=admin_header)
+    assert resp.status_code == 200
+    sets = resp.json()
+    match = [s for s in sets if s["name"] == "Owner Test Set"]
+    assert len(match) == 1
+    assert match[0]["owner_username"] == "regularuser"
+
+
+@pytest.mark.asyncio
+async def test_admin_sample_sets_search(client, admin_header, regular_header):
+    """Search param filters by name and description."""
+    await client.post(
+        "/api/sample-sets",
+        json={"name": "Alpha Set", "description": "first"},
+        headers=regular_header,
+    )
+    await client.post(
+        "/api/sample-sets",
+        json={"name": "Beta Set", "description": "second"},
+        headers=regular_header,
+    )
+
+    # Search by name
+    resp = await client.get(
+        "/api/admin/sample-sets", params={"search": "Alpha"}, headers=admin_header
+    )
+    assert resp.status_code == 200
+    names = [s["name"] for s in resp.json()]
+    assert "Alpha Set" in names
+    assert "Beta Set" not in names
+
+    # Search by description
+    resp = await client.get(
+        "/api/admin/sample-sets", params={"search": "second"}, headers=admin_header
+    )
+    names = [s["name"] for s in resp.json()]
+    assert "Beta Set" in names
+
+
+@pytest.mark.asyncio
+async def test_admin_sample_sets_filter_by_owner(
+    client, admin_header, regular_header, session
+):
+    """owner_id param filters to a specific user's sets."""
+    await client.post(
+        "/api/sample-sets",
+        json={"name": "Filtered Set"},
+        headers=regular_header,
+    )
+    # Get the regular user's id
+    result = await session.exec(select(User).where(User.username == "regularuser"))
+    regular_user = result.one()
+
+    resp = await client.get(
+        "/api/admin/sample-sets",
+        params={"owner_id": str(regular_user.id)},
+        headers=admin_header,
+    )
+    assert resp.status_code == 200
+    sets = resp.json()
+    assert all(s["owner_id"] == str(regular_user.id) for s in sets)

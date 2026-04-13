@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useRevalidator } from "react-router";
 import type { Route } from "./+types/admin.sample-sets";
 import {
@@ -6,8 +6,9 @@ import {
   getStatsApiAdminStatsGet,
   adminRemoveSharedApiAdminSharedSampleSetIdDelete,
   deleteApiSampleSetsSampleSetIdDelete,
+  getUsersApiUsersGet,
 } from "~/api";
-import type { SampleSetRead } from "~/api/types.gen";
+import type { AdminSampleSetRead, UserRead } from "~/api/types.gen";
 import {
   Card,
   CardContent,
@@ -24,6 +25,14 @@ import {
 } from "~/components/ui/table";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
+import { Input } from "~/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,33 +45,77 @@ import {
   AlertDialogTrigger,
 } from "~/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Users, Database, Share2, Trash2 } from "lucide-react";
+import { Users, Database, Share2, Trash2, Search } from "lucide-react";
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: "Admin Sample Sets - MedSeg Cloud" }];
 }
 
 export async function clientLoader({}: Route.ClientLoaderArgs) {
-  const [setsRes, statsRes] = await Promise.all([
+  const [setsRes, statsRes, usersRes] = await Promise.all([
     listAllSampleSetsApiAdminSampleSetsGet(),
     getStatsApiAdminStatsGet(),
+    getUsersApiUsersGet(),
   ]);
   const stats = (statsRes.data ?? {}) as {
     user_count: number;
     sample_set_count: number;
     shared_count: number;
   };
-  return { sampleSets: setsRes.data ?? [], stats };
+  return {
+    sampleSets: setsRes.data ?? [],
+    stats,
+    users: (usersRes.data ?? []) as UserRead[],
+  };
 }
 
 export default function AdminSampleSetsPage({
   loaderData,
 }: Route.ComponentProps) {
-  const { sampleSets, stats } = loaderData;
+  const { sampleSets, stats, users } = loaderData;
   const revalidator = useRevalidator();
+  const [search, setSearch] = useState("");
+  const [ownerId, setOwnerId] = useState<string>("all");
+  const [results, setResults] = useState<AdminSampleSetRead[]>(sampleSets);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // Sync results on initial/revalidation load
+  useEffect(() => {
+    if (!search && ownerId === "all") setResults(sampleSets);
+  }, [sampleSets, search, ownerId]);
+
+  const doSearch = useCallback(
+    async (query: string, owner: string) => {
+      const { data } = await listAllSampleSetsApiAdminSampleSetsGet({
+        query: {
+          search: query || undefined,
+          owner_id: owner === "all" ? undefined : owner,
+        },
+      });
+      setResults(data ?? []);
+    },
+    []
+  );
+
+  const handleSearchChange = useCallback(
+    (value: string) => {
+      setSearch(value);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => doSearch(value, ownerId), 300);
+    },
+    [doSearch, ownerId]
+  );
+
+  const handleOwnerChange = useCallback(
+    (value: string) => {
+      setOwnerId(value);
+      doSearch(search, value);
+    },
+    [doSearch, search]
+  );
 
   const handleDelete = useCallback(
-    async (set: SampleSetRead) => {
+    async (set: AdminSampleSetRead) => {
       try {
         await deleteApiSampleSetsSampleSetIdDelete({
           path: { sample_set_id: set.id },
@@ -77,7 +130,7 @@ export default function AdminSampleSetsPage({
   );
 
   const handleRemoveShared = useCallback(
-    async (set: SampleSetRead) => {
+    async (set: AdminSampleSetRead) => {
       try {
         await adminRemoveSharedApiAdminSharedSampleSetIdDelete({
           path: { sample_set_id: set.id },
@@ -135,26 +188,54 @@ export default function AdminSampleSetsPage({
         </Card>
       </div>
 
+      {/* Search & Filter */}
+      <div className="flex gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search sample sets..."
+            value={search}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <Select value={ownerId} onValueChange={handleOwnerChange}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="All owners" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All owners</SelectItem>
+            {users.map((u) => (
+              <SelectItem key={u.id} value={u.id}>
+                {u.username}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       {/* Sample Sets Table */}
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
-              <TableHead>Owner ID</TableHead>
+              <TableHead>Owner</TableHead>
               <TableHead>Created</TableHead>
               <TableHead className="w-[120px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sampleSets.length === 0 ? (
+            {results.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={4} className="text-center text-muted-foreground">
-                  No sample sets found.
+                  {search || ownerId !== "all"
+                    ? "No matching sample sets."
+                    : "No sample sets found."}
                 </TableCell>
               </TableRow>
             ) : (
-              sampleSets.map((set) => (
+              results.map((set) => (
                 <TableRow key={set.id}>
                   <TableCell>
                     <div>
@@ -167,8 +248,8 @@ export default function AdminSampleSetsPage({
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className="font-mono text-xs">
-                      {set.owner_id.slice(0, 8)}…
+                    <Badge variant="secondary" className="text-xs">
+                      {set.owner_username}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">

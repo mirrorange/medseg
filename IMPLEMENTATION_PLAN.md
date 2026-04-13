@@ -31,7 +31,7 @@ Five features to implement across backend and frontend:
 
 **Tests**: Extend `test_admin.py` with admin create user test
 
-**Status**: Not Started
+**Status**: Complete
 
 ---
 
@@ -59,7 +59,7 @@ Five features to implement across backend and frontend:
 
 **Tests**: Extend `test_tasks.py` with delete/clear tests
 
-**Status**: Not Started
+**Status**: Complete
 
 ---
 
@@ -82,7 +82,7 @@ Five features to implement across backend and frontend:
 
 **Tests**: Extend library tests with search scenarios
 
-**Status**: Not Started
+**Status**: Complete
 
 ---
 
@@ -105,7 +105,7 @@ Five features to implement across backend and frontend:
 
 **Tests**: Extend admin tests
 
-**Status**: Not Started
+**Status**: Complete
 
 ---
 

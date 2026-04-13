@@ -5,6 +5,44 @@ export type ClientOptions = {
 };
 
 /**
+ * AdminSampleSetRead
+ */
+export type AdminSampleSetRead = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Description
+     */
+    description: string | null;
+    /**
+     * Owner Id
+     */
+    owner_id: string;
+    /**
+     * Folder Id
+     */
+    folder_id: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Updated At
+     */
+    updated_at: string;
+    /**
+     * Owner Username
+     */
+    owner_username: string;
+};
+
+/**
  * AdminUserCreate
  */
 export type AdminUserCreate = {
@@ -2435,9 +2473,27 @@ export type CancelTaskEndpointApiTasksTaskIdCancelPostResponse = CancelTaskEndpo
 export type ListAllSampleSetsApiAdminSampleSetsGetData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * Search
+         */
+        search?: string | null;
+        /**
+         * Owner Id
+         */
+        owner_id?: string | null;
+    };
     url: '/api/admin/sample-sets';
 };
+
+export type ListAllSampleSetsApiAdminSampleSetsGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListAllSampleSetsApiAdminSampleSetsGetError = ListAllSampleSetsApiAdminSampleSetsGetErrors[keyof ListAllSampleSetsApiAdminSampleSetsGetErrors];
 
 export type ListAllSampleSetsApiAdminSampleSetsGetResponses = {
     /**
@@ -2445,7 +2501,7 @@ export type ListAllSampleSetsApiAdminSampleSetsGetResponses = {
      *
      * Successful Response
      */
-    200: Array<SampleSetRead>;
+    200: Array<AdminSampleSetRead>;
 };
 
 export type ListAllSampleSetsApiAdminSampleSetsGetResponse = ListAllSampleSetsApiAdminSampleSetsGetResponses[keyof ListAllSampleSetsApiAdminSampleSetsGetResponses];
