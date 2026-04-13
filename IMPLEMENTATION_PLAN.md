@@ -36,4 +36,4 @@
 **Goal**: 实现所有对话框（新建子集、重命名、删除、属性、上传、运行管线）并移除旧组件
 **Success Criteria**: 所有对话框可正确打开/提交/关闭；旧组件已移除；页面功能完整
 **Tests**: 对话框操作不报错、API 调用正确
-**Status**: Not Started
+**Status**: Complete

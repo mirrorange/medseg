@@ -12,6 +12,10 @@ import {
 } from "~/api";
 import type { SubsetRead, ImageRead, ModuleAwarenessItem } from "~/api/types.gen";
 import { SampleSetBrowser } from "~/features/sample-set/sample-set-browser";
+import { CreateSubsetDialog } from "~/features/sample-set/create-subset-dialog";
+import { RenameDialog } from "~/features/sample-set/rename-dialog";
+import { PropertiesDialog } from "~/features/sample-set/properties-dialog";
+import { ImageUploadDialog } from "~/features/sample-set/image-upload-dialog";
 import { ConfirmDialog } from "~/components/confirm-dialog";
 import { useSampleSetStore } from "~/stores/sample-set";
 
@@ -40,6 +44,25 @@ export default function SampleSetDetailPage({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteDescription, setDeleteDescription] = useState("");
+
+  // Create subset
+  const [createSubsetOpen, setCreateSubsetOpen] = useState(false);
+
+  // Upload images
+  const [uploadOpen, setUploadOpen] = useState(false);
+
+  // Rename
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<{
+    type: "subset" | "image";
+    id: string;
+    subsetId?: string;
+    name: string;
+  } | null>(null);
+
+  // Properties
+  const [propsOpen, setPropsOpen] = useState(false);
+  const [propsItem, setPropsItem] = useState<SubsetRead | ImageRead | null>(null);
 
   // Share
   const handleShare = useCallback(() => {
@@ -128,7 +151,7 @@ export default function SampleSetDetailPage({
     [sampleSet.id],
   );
 
-  // Primary action button: run primary module on all its recommended subsets
+  // Primary action button
   const handlePrimaryAction = useCallback(() => {
     const store = useSampleSetStore.getState();
     const primary = store.awareness?.primary;
@@ -136,21 +159,40 @@ export default function SampleSetDetailPage({
     handleRunPipeline(primary, primary.recommended_subset_ids);
   }, [handleRunPipeline]);
 
-  // Placeholder callbacks for Stage 6
+  // Create subset
   const handleCreateSubset = useCallback(() => {
-    toast.info("Create subset dialog coming in Stage 6");
+    setCreateSubsetOpen(true);
   }, []);
 
+  // Upload images (only available when inside a subset)
   const handleUploadImages = useCallback(() => {
-    toast.info("Upload dialog coming in Stage 6");
+    setUploadOpen(true);
   }, []);
 
-  const handleRename = useCallback((_item: SubsetRead | ImageRead) => {
-    toast.info("Rename dialog coming in Stage 6");
+  // Rename item
+  const handleRename = useCallback((item: SubsetRead | ImageRead) => {
+    const store = useSampleSetStore.getState();
+    if (store.level === "subsets") {
+      setRenameTarget({ type: "subset", id: item.id, name: (item as SubsetRead).name });
+    } else {
+      setRenameTarget({
+        type: "image",
+        id: item.id,
+        subsetId: store.currentSubsetId ?? undefined,
+        name: (item as ImageRead).filename,
+      });
+    }
+    setRenameOpen(true);
   }, []);
 
-  const handleProperties = useCallback((_item: SubsetRead | ImageRead) => {
-    toast.info("Properties dialog coming in Stage 6");
+  // Properties
+  const handleProperties = useCallback((item: SubsetRead | ImageRead) => {
+    setPropsItem(item);
+    setPropsOpen(true);
+  }, []);
+
+  const storeRefresh = useCallback(() => {
+    void useSampleSetStore.getState().refresh();
   }, []);
 
   return (
@@ -188,6 +230,39 @@ export default function SampleSetDetailPage({
         loading={deleteLoading}
         destructive
       />
+      <CreateSubsetDialog
+        open={createSubsetOpen}
+        onOpenChange={setCreateSubsetOpen}
+        sampleSetId={sampleSet.id}
+        onCreated={storeRefresh}
+      />
+      {renameTarget && (
+        <RenameDialog
+          open={renameOpen}
+          onOpenChange={setRenameOpen}
+          sampleSetId={sampleSet.id}
+          type={renameTarget.type}
+          itemId={renameTarget.id}
+          subsetId={renameTarget.subsetId}
+          currentName={renameTarget.name}
+          onRenamed={storeRefresh}
+        />
+      )}
+      <PropertiesDialog
+        open={propsOpen}
+        onOpenChange={setPropsOpen}
+        item={propsItem}
+        level={useSampleSetStore.getState().level}
+      />
+      {useSampleSetStore.getState().currentSubsetId && (
+        <ImageUploadDialog
+          open={uploadOpen}
+          onOpenChange={setUploadOpen}
+          sampleSetId={sampleSet.id}
+          subsetId={useSampleSetStore.getState().currentSubsetId!}
+          onUploaded={storeRefresh}
+        />
+      )}
     </div>
   );
 }
