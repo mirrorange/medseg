@@ -12,6 +12,8 @@ import type {
   AwarenessResponse,
 } from "~/api/types.gen";
 
+const EMPTY_ITEMS: Array<SubsetRead | ImageRead> = [];
+
 // -- Types -------------------------------------------------------
 
 export type BrowseLevel = "subsets" | "images";
@@ -77,8 +79,8 @@ interface SampleSetBrowserState {
 // -- Helpers -----------------------------------------------------
 
 function currentItems(state: SampleSetBrowserState): { id: string }[] {
-  if (state.level === "images") return state.currentSubset?.images ?? [];
-  return state.sampleSet?.subsets ?? [];
+  if (state.level === "images") return state.currentSubset?.images ?? EMPTY_ITEMS;
+  return state.sampleSet?.subsets ?? EMPTY_ITEMS;
 }
 
 // -- Store -------------------------------------------------------
@@ -236,8 +238,8 @@ export const useSampleSetStore = create<SampleSetBrowserState>((set, get) => ({
 /** Get current items based on browse level */
 export function useCurrentItems(): (SubsetRead | ImageRead)[] {
   return useSampleSetStore((s) => {
-    if (s.level === "images") return s.currentSubset?.images ?? [];
-    return s.sampleSet?.subsets ?? [];
+    if (s.level === "images") return s.currentSubset?.images ?? EMPTY_ITEMS;
+    return s.sampleSet?.subsets ?? EMPTY_ITEMS;
   });
 }
 
