@@ -427,6 +427,12 @@ async def require_owner(resource_owner_id: UUID, user: User = Depends(get_curren
 - `params`：模块运行参数，由模块 `params_schema` 定义，Pydantic 校验；校验失败立即返回错误
 - `overwrite`：若为 `true` 且同名子集已存在，任务执行完成后先删除旧子集再存储新子集；若为 `false` 且同名子集已存在，后端返回 `402002 SubsetNameConflict` 错误
 
+> **运行时冲突处理**：由于多个任务可能并发产出同名子集，`execute_task()` 在创建输出子集时使用以下策略：
+> 1. `overwrite=True`：删除已存在的同名子集，然后创建新子集
+> 2. `overwrite=False`：若 DB 唯一约束冲突（`IntegrityError`），标记任务为 `failed`，错误信息说明名称冲突
+> 
+> 此外，`submit_task()` 提交时会检查是否有同一 `sample_set_id` 下其他排队/运行中任务已使用相同 `output_subset_name`（且 `overwrite=False`），有则拒绝提交。
+
 **`POST /api/pipelines/batch-run` 请求体**：
 
 ```json

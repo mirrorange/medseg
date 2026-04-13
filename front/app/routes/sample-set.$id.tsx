@@ -283,7 +283,7 @@ export default function SampleSetDetailPage({
           sampleSetId={sampleSet.id}
           module={pipelineModule}
           inputSubsetIds={pipelineSubsetIds}
-          subsets={sampleSet.subsets ?? []}
+          subsets={storeSampleSet?.subsets ?? sampleSet.subsets ?? []}
           onSubmitted={handlePipelineSubmitted}
         />
       )}

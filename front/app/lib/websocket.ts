@@ -44,11 +44,15 @@ export class TaskWebSocket {
       try {
         const message = JSON.parse(event.data);
         if (message.type === "task_status_update") {
-          useTaskStore.getState().updateTask(message.data.task_id, {
-            status: message.data.status,
-            queue_position: message.data.queue_position,
-            estimated_wait_ms: message.data.estimated_wait_ms,
-          });
+          const d = message.data;
+          useTaskStore.getState().upsertTasks([{
+            id: d.task_id,
+            status: d.status,
+            module_name: d.module_name ?? "",
+            sample_set_id: d.sample_set_id ?? "",
+            queue_position: d.queue_position ?? null,
+            estimated_wait_ms: d.estimated_wait_ms ?? null,
+          }]);
         }
       } catch {
         // ignore malformed messages

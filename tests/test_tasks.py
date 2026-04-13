@@ -460,3 +460,73 @@ async def test_submit_task_overwrite_defaults_false(
     assert resp.status_code == 201
     task = resp.json()
     assert task["overwrite"] is False
+
+
+@pytest.mark.asyncio
+async def test_submit_task_rejects_pending_name_conflict(
+    client, auth_header, sample_set_with_subset
+):
+    """When a queued task already targets the same output name, a second non-overwrite task should be rejected."""
+    data = sample_set_with_subset
+    # First task succeeds
+    resp1 = await client.post(
+        "/api/pipelines/run",
+        json={
+            "module_name": "echo",
+            "sample_set_id": data["sample_set_id"],
+            "input_subset_id": data["subset_id"],
+            "output_subset_name": "same_name",
+            "overwrite": False,
+        },
+        headers=auth_header,
+    )
+    assert resp1.status_code == 201
+
+    # Second task with same name should be rejected (409)
+    resp2 = await client.post(
+        "/api/pipelines/run",
+        json={
+            "module_name": "echo",
+            "sample_set_id": data["sample_set_id"],
+            "input_subset_id": data["subset_id"],
+            "output_subset_name": "same_name",
+            "overwrite": False,
+        },
+        headers=auth_header,
+    )
+    assert resp2.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_submit_task_allows_overwrite_with_pending(
+    client, auth_header, sample_set_with_subset
+):
+    """When overwrite=True, task should be accepted even if pending task has same name."""
+    data = sample_set_with_subset
+    # First task (no overwrite)
+    resp1 = await client.post(
+        "/api/pipelines/run",
+        json={
+            "module_name": "echo",
+            "sample_set_id": data["sample_set_id"],
+            "input_subset_id": data["subset_id"],
+            "output_subset_name": "overwrite_name",
+            "overwrite": False,
+        },
+        headers=auth_header,
+    )
+    assert resp1.status_code == 201
+
+    # Second task with overwrite=True should succeed
+    resp2 = await client.post(
+        "/api/pipelines/run",
+        json={
+            "module_name": "echo",
+            "sample_set_id": data["sample_set_id"],
+            "input_subset_id": data["subset_id"],
+            "output_subset_name": "overwrite_name",
+            "overwrite": True,
+        },
+        headers=auth_header,
+    )
+    assert resp2.status_code == 201

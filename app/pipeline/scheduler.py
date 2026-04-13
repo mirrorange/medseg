@@ -248,6 +248,9 @@ async def _notify_task_status(
     user_id: uuid.UUID,
     task_id: uuid.UUID,
     status: str,
+    *,
+    module_name: str = "",
+    sample_set_id: uuid.UUID | None = None,
 ) -> None:
     """Push task status update via WebSocket (best-effort)."""
     try:
@@ -260,6 +263,8 @@ async def _notify_task_status(
                 "data": {
                     "task_id": str(task_id),
                     "status": status,
+                    "module_name": module_name,
+                    "sample_set_id": str(sample_set_id) if sample_set_id else "",
                 },
             },
         )
@@ -325,7 +330,7 @@ async def execute_task(
             session.add(task)
             await session.commit()
 
-        await _notify_task_status(user_id, task_id, "loading")
+        await _notify_task_status(user_id, task_id, "loading", module_name=module_name, sample_set_id=sample_set_id)
 
         # --- Load module ---
         mod = registry.get(module_name)
@@ -345,7 +350,7 @@ async def execute_task(
             session.add(task)
             await session.commit()
 
-        await _notify_task_status(user_id, task_id, "running")
+        await _notify_task_status(user_id, task_id, "running", module_name=module_name, sample_set_id=sample_set_id)
 
         # --- Stage input files ---
         work_dir = Path(tempfile.mkdtemp(prefix="medseg_task_"))
@@ -430,7 +435,16 @@ async def execute_task(
                 source_params=params,
             )
             session.add(output_subset)
-            await session.flush()
+            try:
+                await session.flush()
+            except Exception as flush_exc:
+                # Check for unique constraint violation (subset name conflict)
+                if "UNIQUE constraint failed" in str(flush_exc) or "IntegrityError" in type(flush_exc).__name__:
+                    raise RuntimeError(
+                        f"Output subset name '{output_subset_name}' already exists. "
+                        "Use overwrite=true or choose a different name."
+                    ) from flush_exc
+                raise
 
             # Save output images
             for out_img in run_output.images:
@@ -470,7 +484,7 @@ async def execute_task(
             await session.commit()
 
         logger.info("Task %s completed successfully", task_id)
-        await _notify_task_status(user_id, task_id, "completed")
+        await _notify_task_status(user_id, task_id, "completed", module_name=module_name, sample_set_id=sample_set_id)
 
     except Exception as exc:
         logger.exception("Task %s failed: %s", task_id, exc)
@@ -505,14 +519,14 @@ async def execute_task(
                     task_id,
                     task.retry_count,
                 )
-                await _notify_task_status(user_id, task_id, "queued")
+                await _notify_task_status(user_id, task_id, "queued", module_name=module_name, sample_set_id=sample_set_id)
             else:
                 task.status = TaskStatus.failed
                 task.error_message = str(exc)
                 task.completed_at = datetime.now(UTC)
                 session.add(task)
                 await session.commit()
-                await _notify_task_status(user_id, task_id, "failed")
+                await _notify_task_status(user_id, task_id, "failed", module_name=module_name, sample_set_id=sample_set_id)
 
     finally:
         # Cleanup temp directory

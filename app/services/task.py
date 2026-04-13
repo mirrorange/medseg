@@ -7,6 +7,25 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.exceptions import ModuleNotAvailable, TaskNotCancellable, TaskNotFound
 from app.models.task import Task, TaskStatus
+from app.services.sample_set import SubsetNameConflict
+
+
+async def _check_pending_task_name_conflict(
+    session: AsyncSession,
+    sample_set_id: uuid.UUID,
+    output_subset_name: str,
+) -> None:
+    """Raise SubsetNameConflict if a queued/loading/running task already targets this name."""
+    active_statuses = [TaskStatus.queued, TaskStatus.loading, TaskStatus.running]
+    stmt = select(Task).where(
+        Task.sample_set_id == sample_set_id,
+        Task.output_subset_name == output_subset_name,
+        Task.status.in_(active_statuses),  # type: ignore[attr-defined]
+        Task.overwrite == False,  # noqa: E712
+    )
+    result = await session.exec(stmt)
+    if result.first() is not None:
+        raise SubsetNameConflict()
 
 
 async def submit_task(
@@ -27,6 +46,12 @@ async def submit_task(
     mod = registry.get(module_name)
     if mod is None or not registry.is_enabled(module_name):
         raise ModuleNotAvailable()
+
+    # Check for pending task with same output name (only if not overwriting)
+    if not overwrite:
+        await _check_pending_task_name_conflict(
+            session, sample_set_id, output_subset_name
+        )
 
     task = Task(
         user_id=user_id,

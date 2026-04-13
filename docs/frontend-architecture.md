@@ -478,11 +478,16 @@ export class TaskWebSocket {
     this.ws.onmessage = (event) => {
       const message = JSON.parse(event.data);
       if (message.type === "task_status_update") {
-        useTaskStore.getState().updateTask(message.data.task_id, {
+        // Use upsertTasks to handle tasks not yet in store
+        // (e.g. submitted but WS update arrives before store is populated)
+        useTaskStore.getState().upsertTasks([{
+          id: message.data.task_id,
           status: message.data.status,
-          queuePosition: message.data.queue_position,
-          estimatedWaitMs: message.data.estimated_wait_ms,
-        });
+          module_name: message.data.module_name ?? "",
+          sample_set_id: message.data.sample_set_id ?? "",
+          queue_position: message.data.queue_position ?? null,
+          estimated_wait_ms: message.data.estimated_wait_ms ?? null,
+        }]);
       }
     };
 
@@ -1442,6 +1447,7 @@ type SampleSetAction =
   - 多个子集：显示输出名称模板输入框（默认 `{input_name}_{module}`）+ 模板预览列表
 - **名称冲突检测**：
   - 提交前在前端对比当前样本集的子集列表，检查生成的输出名称是否已存在
+  - **重要**：子集列表必须从 Zustand store（`useSampleSetStore`）获取而非路由加载器数据，以确保反映最新状态（删除/新建子集后的实时数据）
   - 若存在冲突：在对话框内显示覆盖确认提示（如「子集 "xxx" 已存在，覆盖将删除原有数据」）
   - 用户确认覆盖后，提交时 `overwrite=true`；不确认则回到编辑状态修改名称
   - 批量运行时，对每个生成的名称独立检测冲突
