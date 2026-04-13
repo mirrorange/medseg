@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { useSampleSetStore, useCurrentItems } from "~/stores/sample-set";
 import { SampleSetToolbar } from "./sample-set-toolbar";
+import { SampleSetListView } from "./sample-set-list-view";
+import { SampleSetGridView } from "./sample-set-grid-view";
+import { useLassoSelection, LassoOverlay } from "~/features/library/use-lasso-selection";
 import type { SubsetRead, ImageRead } from "~/api/types.gen";
 
 interface SampleSetBrowserProps {
@@ -45,6 +48,29 @@ export function SampleSetBrowser({
   const items = useCurrentItems();
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Lasso selection
+  const lassoState = useLassoSelection({
+    containerRef,
+    itemSelector: "[data-ss-item]",
+    getIdFromElement: (el) => el.getAttribute("data-item-id"),
+    onSelect: useCallback(
+      (ids: string[], additive: boolean) => {
+        if (additive) {
+          const merged = [...selectedIds];
+          const seen = new globalThis.Set(selectedIds);
+          for (const id of ids) {
+            if (!seen.has(id)) merged.push(id);
+          }
+          useSampleSetStore.getState().setSelection(merged);
+        } else {
+          useSampleSetStore.getState().setSelection(ids);
+        }
+      },
+      [selectedIds],
+    ),
+    enabled: !isLoading,
+  });
+
   // Load data on mount / when sampleSetId changes
   useEffect(() => {
     void loadSampleSet(sampleSetId);
@@ -81,20 +107,6 @@ export function SampleSetBrowser({
       // For images: could open viewer in future
     },
     [level, openSubset],
-  );
-
-  // Click handler for items
-  const handleClick = useCallback(
-    (e: React.MouseEvent, item: SubsetRead | ImageRead) => {
-      if (e.shiftKey) {
-        useSampleSetStore.getState().selectRange(item.id);
-      } else if (e.metaKey || e.ctrlKey) {
-        useSampleSetStore.getState().select(item.id, true);
-      } else {
-        useSampleSetStore.getState().select(item.id);
-      }
-    },
-    [],
   );
 
   // Context menu on item
@@ -139,140 +151,27 @@ export function SampleSetBrowser({
             </div>
           ) : error ? (
             <div className="text-destructive py-12 text-center text-sm">{error}</div>
-          ) : items.length === 0 ? (
-            <div className="text-muted-foreground py-12 text-center text-sm">
-              {level === "subsets"
-                ? "No subsets yet. Create a subset or upload images to get started."
-                : "No images in this subset."}
-            </div>
           ) : viewMode === "list" ? (
-            <SampleSetListViewPlaceholder
+            <SampleSetListView
               items={items}
               level={level}
               selectedIds={selectedIds}
-              onClick={handleClick}
-              onDoubleClick={handleOpen}
+              onOpen={handleOpen}
               onContextMenu={handleItemContextMenu}
             />
           ) : (
-            <SampleSetGridViewPlaceholder
+            <SampleSetGridView
               items={items}
               level={level}
               selectedIds={selectedIds}
-              onClick={handleClick}
-              onDoubleClick={handleOpen}
+              onOpen={handleOpen}
               onContextMenu={handleItemContextMenu}
             />
           )}
         </div>
       </ScrollArea>
-    </div>
-  );
-}
 
-// -- Temporary inline views (will be extracted to separate files in Stage 4) --
-
-function SampleSetListViewPlaceholder({
-  items,
-  level,
-  selectedIds,
-  onClick,
-  onDoubleClick,
-  onContextMenu,
-}: {
-  items: (SubsetRead | ImageRead)[];
-  level: "subsets" | "images";
-  selectedIds: string[];
-  onClick: (e: React.MouseEvent, item: SubsetRead | ImageRead) => void;
-  onDoubleClick: (item: SubsetRead | ImageRead) => void;
-  onContextMenu: (e: React.MouseEvent, item: SubsetRead | ImageRead) => void;
-}) {
-  const formatDate = (d: string) => new Date(d).toLocaleDateString();
-
-  return (
-    <table className="w-full text-sm">
-      <thead>
-        <tr className="text-muted-foreground border-b text-left text-xs">
-          <th className="px-3 py-2">Name</th>
-          <th className="px-3 py-2">Type</th>
-          <th className="px-3 py-2">Created</th>
-        </tr>
-      </thead>
-      <tbody>
-        {items.map((item) => {
-          const isSelected = selectedIds.includes(item.id);
-          return (
-            <tr
-              key={item.id}
-              data-ss-item
-              data-item-id={item.id}
-              data-selected={isSelected || undefined}
-              className={`cursor-pointer select-none border-b transition-colors hover:bg-accent/50 ${
-                isSelected ? "bg-accent" : ""
-              }`}
-              onClick={(e) => onClick(e, item)}
-              onDoubleClick={() => onDoubleClick(item)}
-              onContextMenu={(e) => onContextMenu(e, item)}
-            >
-              <td className="px-3 py-2 font-medium">
-                {"filename" in item ? item.filename : item.name}
-              </td>
-              <td className="text-muted-foreground px-3 py-2">
-                {level === "subsets" ? (item as SubsetRead).type : (item as ImageRead).format}
-              </td>
-              <td className="text-muted-foreground px-3 py-2 text-xs">
-                {formatDate(item.created_at)}
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
-  );
-}
-
-function SampleSetGridViewPlaceholder({
-  items,
-  level,
-  selectedIds,
-  onClick,
-  onDoubleClick,
-  onContextMenu,
-}: {
-  items: (SubsetRead | ImageRead)[];
-  level: "subsets" | "images";
-  selectedIds: string[];
-  onClick: (e: React.MouseEvent, item: SubsetRead | ImageRead) => void;
-  onDoubleClick: (item: SubsetRead | ImageRead) => void;
-  onContextMenu: (e: React.MouseEvent, item: SubsetRead | ImageRead) => void;
-}) {
-  return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-2 p-2">
-      {items.map((item) => {
-        const isSelected = selectedIds.includes(item.id);
-        const name = "filename" in item ? item.filename : item.name;
-        return (
-          <div
-            key={item.id}
-            data-ss-item
-            data-item-id={item.id}
-            data-selected={isSelected || undefined}
-            className={`flex cursor-pointer select-none flex-col items-center gap-1 rounded-lg border p-3 transition-colors hover:bg-accent/50 ${
-              isSelected ? "bg-accent border-primary/30" : ""
-            }`}
-            onClick={(e) => onClick(e, item)}
-            onDoubleClick={() => onDoubleClick(item)}
-            onContextMenu={(e) => onContextMenu(e, item)}
-          >
-            <div className="text-muted-foreground flex size-10 items-center justify-center text-2xl">
-              {level === "subsets" ? "📁" : "🖼️"}
-            </div>
-            <span className="w-full truncate text-center text-xs" title={name}>
-              {name}
-            </span>
-          </div>
-        );
-      })}
+      <LassoOverlay rect={lassoState.rect} />
     </div>
   );
 }

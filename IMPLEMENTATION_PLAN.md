@@ -24,7 +24,7 @@
 **Goal**: 实现双视图（列表/网格）和鼠标框选
 **Success Criteria**: 子集和图像可在列表/网格视图间切换；支持单击、Ctrl/Shift 多选、框选
 **Tests**: 视图渲染正确、选择交互正常
-**Status**: Not Started
+**Status**: Complete
 
 ## Stage 5: Frontend — 右键菜单 + 管线集成 + 工具栏
 **Goal**: 实现右键上下文菜单（含管线操作建议）和首选操作按钮
