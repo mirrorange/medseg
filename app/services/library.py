@@ -445,12 +445,19 @@ async def unshare_sample_set(
 
 async def list_shared_sample_sets(
     session: AsyncSession,
+    search: str | None = None,
 ) -> list[SharedSampleSetRead]:
-    result = await session.exec(
+    stmt = (
         select(Share, SampleSet, User)
         .join(SampleSet, Share.sample_set_id == SampleSet.id)
         .join(User, Share.shared_by == User.id)
     )
+    if search:
+        pattern = f"%{search}%"
+        stmt = stmt.where(
+            SampleSet.name.ilike(pattern) | SampleSet.description.ilike(pattern)  # type: ignore[union-attr]
+        )
+    result = await session.exec(stmt)
     items = []
     for share, sample_set, user in result.all():
         items.append(

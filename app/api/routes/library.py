@@ -132,10 +132,11 @@ async def batch_move(
 
 @router.get("/shared", response_model=list[SharedSampleSetRead])
 async def list_shared(
+    search: str | None = Query(None),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    return await list_shared_sample_sets(session)
+    return await list_shared_sample_sets(session, search=search)
 
 
 @router.post("/shared/{sample_set_id}", status_code=201)

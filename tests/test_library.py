@@ -259,6 +259,45 @@ async def test_copy_shared(client: AsyncClient, auth_headers, second_auth_header
 
 
 @pytest.mark.asyncio
+async def test_shared_search(client: AsyncClient, auth_headers):
+    """Search shared library by name and description."""
+    # Create and share two sample sets
+    resp = await client.post(
+        "/api/sample-sets",
+        headers=auth_headers,
+        json={"name": "Brain MRI Study", "description": "Neurology department"},
+    )
+    ss1_id = resp.json()["id"]
+    await client.post(f"/api/library/shared/{ss1_id}", headers=auth_headers)
+
+    resp = await client.post(
+        "/api/sample-sets",
+        headers=auth_headers,
+        json={"name": "Lung CT Study", "description": "Radiology scan data"},
+    )
+    ss2_id = resp.json()["id"]
+    await client.post(f"/api/library/shared/{ss2_id}", headers=auth_headers)
+
+    # Search by name
+    resp = await client.get("/api/library/shared?search=brain", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["sample_set_name"] == "Brain MRI Study"
+
+    # Search by description
+    resp = await client.get("/api/library/shared?search=radiology", headers=auth_headers)
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["sample_set_name"] == "Lung CT Study"
+
+    # Empty search returns all
+    resp = await client.get("/api/library/shared", headers=auth_headers)
+    data = resp.json()
+    assert len(data) >= 2
+
+
+@pytest.mark.asyncio
 async def test_nonexistent_folder_404(client: AsyncClient, auth_headers):
     fake_id = str(uuid.uuid4())
     resp = await client.put(

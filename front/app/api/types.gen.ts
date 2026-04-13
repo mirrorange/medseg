@@ -1914,9 +1914,23 @@ export type BatchMoveApiLibraryBatchMovePostResponse = BatchMoveApiLibraryBatchM
 export type ListSharedApiLibrarySharedGetData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * Search
+         */
+        search?: string | null;
+    };
     url: '/api/library/shared';
 };
+
+export type ListSharedApiLibrarySharedGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListSharedApiLibrarySharedGetError = ListSharedApiLibrarySharedGetErrors[keyof ListSharedApiLibrarySharedGetErrors];
 
 export type ListSharedApiLibrarySharedGetResponses = {
     /**
