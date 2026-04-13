@@ -27,6 +27,7 @@ class Task(SQLModel, table=True):
     params: dict[str, Any] | None = Field(
         default=None, sa_column=Column("params", JSON)
     )
+    overwrite: bool = Field(default=False)
     status: TaskStatus = Field(default=TaskStatus.queued)
     error_message: str | None = None
     retry_count: int = Field(default=0)

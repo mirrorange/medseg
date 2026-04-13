@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Optional
 
-from sqlalchemy import Column
+from sqlalchemy import Column, UniqueConstraint
 from sqlalchemy.types import JSON
 from sqlmodel import Field, Relationship, SQLModel
 
@@ -12,6 +12,10 @@ if TYPE_CHECKING:
 
 
 class Subset(SQLModel, table=True):
+    __table_args__ = (
+        UniqueConstraint("sample_set_id", "name", name="uq_subset_sample_set_name"),
+    )
+
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     sample_set_id: uuid.UUID = Field(foreign_key="sampleset.id", index=True)
     name: str = Field(max_length=255)

@@ -13,6 +13,7 @@ class TaskCreate(BaseModel):
     input_subset_id: uuid.UUID
     output_subset_name: str
     params: dict[str, Any] | None = None
+    overwrite: bool = False
 
 
 class TaskRead(BaseModel):
@@ -23,6 +24,7 @@ class TaskRead(BaseModel):
     input_subset_id: uuid.UUID
     output_subset_name: str
     params: dict[str, Any] | None
+    overwrite: bool
     status: TaskStatus
     error_message: str | None
     retry_count: int
@@ -37,6 +39,7 @@ class BatchTaskCreate(BaseModel):
     input_subset_ids: list[uuid.UUID]
     output_subset_name_template: str = "{input_name}_{module}"
     params: dict[str, Any] | None = None
+    overwrite: bool = False
 
 
 class BatchTaskError(BaseModel):

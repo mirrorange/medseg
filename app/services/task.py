@@ -18,6 +18,7 @@ async def submit_task(
     input_subset_id: uuid.UUID,
     output_subset_name: str,
     params: dict | None = None,
+    overwrite: bool = False,
 ) -> Task:
     """Create a task record and enqueue it in the scheduler."""
     from app.pipeline.state import registry, scheduler
@@ -34,6 +35,7 @@ async def submit_task(
         input_subset_id=input_subset_id,
         output_subset_name=output_subset_name,
         params=params,
+        overwrite=overwrite,
         status=TaskStatus.queued,
     )
     session.add(task)
@@ -48,6 +50,7 @@ async def submit_task(
         output_subset_name=output_subset_name,
         user_id=user_id,
         params=params,
+        overwrite=overwrite,
     )
 
     return task
@@ -98,6 +101,7 @@ async def submit_batch_tasks(
     input_subset_ids: list[uuid.UUID],
     output_subset_name_template: str,
     params: dict | None = None,
+    overwrite: bool = False,
 ) -> tuple[list[dict], list[dict]]:
     """Submit one task per input subset. Returns (task_dicts, errors).
 
@@ -124,6 +128,7 @@ async def submit_batch_tasks(
                 input_subset_id=subset_id,
                 output_subset_name=output_name,
                 params=params,
+                overwrite=overwrite,
             )
             # Convert to dict while session is still active
             tasks.append({
@@ -134,6 +139,7 @@ async def submit_batch_tasks(
                 "input_subset_id": task.input_subset_id,
                 "output_subset_name": task.output_subset_name,
                 "params": task.params,
+                "overwrite": task.overwrite,
                 "status": task.status,
                 "error_message": task.error_message,
                 "retry_count": task.retry_count,

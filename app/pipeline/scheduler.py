@@ -93,6 +93,7 @@ class Scheduler:
         output_subset_name: str,
         user_id: uuid.UUID,
         params: dict[str, Any] | None = None,
+        overwrite: bool = False,
     ) -> int:
         """Add a task to the appropriate module queue.
 
@@ -106,6 +107,7 @@ class Scheduler:
             "output_subset_name": output_subset_name,
             "user_id": user_id,
             "params": params or {},
+            "overwrite": overwrite,
             "enqueued_at": datetime.now(UTC),
         }
         self._entries[task_id] = entry
@@ -306,6 +308,7 @@ async def execute_task(
     output_subset_name = entry["output_subset_name"]
     user_id = entry["user_id"]
     params = entry["params"]
+    overwrite = entry.get("overwrite", False)
 
     storage = get_storage()
     work_dir = None
@@ -401,6 +404,21 @@ async def execute_task(
 
         # --- Collect output ---
         async with AsyncSession(app_engine) as session:
+            # If overwrite is enabled, delete existing subset with same name
+            if overwrite:
+                from sqlmodel import select as sel
+
+                result = await session.exec(
+                    sel(Subset).where(
+                        Subset.sample_set_id == sample_set_id,
+                        Subset.name == output_subset_name,
+                    )
+                )
+                existing = result.first()
+                if existing is not None:
+                    await session.delete(existing)
+                    await session.flush()
+
             # Create output subset
             output_subset = Subset(
                 sample_set_id=sample_set_id,
@@ -480,6 +498,7 @@ async def execute_task(
                     output_subset_name=output_subset_name,
                     user_id=user_id,
                     params=params,
+                    overwrite=entry.get("overwrite", False),
                 )
                 logger.info(
                     "Task %s re-enqueued (retry %d)",

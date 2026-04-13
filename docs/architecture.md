@@ -196,6 +196,8 @@ app/
 | source_params | JSON (nullable) | 运行参数快照 |
 | created_at | datetime | 创建时间 |
 
+**唯一约束**：`(sample_set_id, name)` 联合唯一索引，同一样本集内不允许重名子集。
+
 #### Image
 
 | 字段 | 类型 | 说明 |
@@ -229,6 +231,7 @@ app/
 | input_subset_id | UUID FK → Subset | 输入子集 |
 | output_subset_name | str | 输出子集名称 |
 | params | JSON (nullable) | 运行参数 |
+| overwrite | bool | 是否覆盖同名子集（默认 false） |
 | status | enum(queued, loading, running, completed, failed) | 任务状态 |
 | queue_position | int (nullable) | 排队位置 |
 | error_message | str (nullable) | 失败原因 |
@@ -375,7 +378,7 @@ async def require_owner(resource_owner_id: UUID, user: User = Depends(get_curren
 | 方法 | 路径 | 说明 | 权限 |
 | --- | --- | --- | --- |
 | POST | `/api/sample-sets` | 创建样本集 | 已认证 |
-| GET | `/api/sample-sets/{id}` | 获取样本集详情（含子集列表） | 所有者/管理员 |
+| GET | `/api/sample-sets/{id}` | 获取样本集详情（含子集列表 + `is_shared` 字段） | 所有者/管理员 |
 | PUT | `/api/sample-sets/{id}` | 更新样本集（名称/描述/位置） | 所有者 |
 | DELETE | `/api/sample-sets/{id}` | 删除样本集（级联删除子集和图像） | 所有者 |
 | GET | `/api/sample-sets/{id}/awareness` | 获取管线感知建议（三级分层响应） | 所有者/管理员 |
@@ -406,6 +409,38 @@ async def require_owner(resource_owner_id: UUID, user: User = Depends(get_curren
 | GET | `/api/pipelines/modules/{name}` | 获取单个模块详情 | 已认证 |
 | POST | `/api/pipelines/run` | 提交处理任务 | 已认证 |
 | POST | `/api/pipelines/batch-run` | 批量提交处理任务（每个子集一个任务） | 已认证 |
+
+**`POST /api/pipelines/run` 请求体**：
+
+```json
+{
+  "module_name": "segmentation_v1",
+  "sample_set_id": "uuid",
+  "input_subset_id": "uuid",
+  "output_subset_name": "segmentation_result",
+  "params": { "threshold": 0.5 },
+  "overwrite": false
+}
+```
+
+- `output_subset_name`：用户指定的输出子集名称
+- `params`：模块运行参数，由模块 `params_schema` 定义，Pydantic 校验；校验失败立即返回错误
+- `overwrite`：若为 `true` 且同名子集已存在，任务执行完成后先删除旧子集再存储新子集；若为 `false` 且同名子集已存在，后端返回 `402002 SubsetNameConflict` 错误
+
+**`POST /api/pipelines/batch-run` 请求体**：
+
+```json
+{
+  "module_name": "segmentation_v1",
+  "sample_set_id": "uuid",
+  "input_subset_ids": ["uuid-1", "uuid-2"],
+  "output_subset_name_template": "{input_name}_{module}",
+  "params": { "threshold": 0.5 },
+  "overwrite": false
+}
+```
+
+- `output_subset_name_template`：名称模板，`{input_name}` 替换为各输入子集名称，`{module}` 替换为模块名称
 | PUT | `/api/pipelines/modules/{name}/enable` | 启用模块 | 管理员 |
 | PUT | `/api/pipelines/modules/{name}/disable` | 禁用模块 | 管理员 |
 | POST | `/api/pipelines/modules/{name}/load` | 手动加载模块 | 管理员 |
@@ -548,9 +583,20 @@ class PipelineModule(ABC):
  │                                    ├─ 7. 返回 RunOutput ──────>│
  ├─ 8. 从 output_dir 读取文件          │
  │     上传到对象存储                   │
+ ├─ 8.5 若 overwrite=true 且同名子集   │
+ │     已存在 → 删除旧子集及其图像      │
  ├─ 9. 创建 Subset + Image 记录        │
  ├─ 10. 清理临时目录                   │
 ```
+
+#### 子集名称唯一性校验
+
+管线任务提交时（`POST /api/pipelines/run`），后端校验 `output_subset_name` 在目标样本集中的唯一性：
+
+- `overwrite=false`（默认）：若同名子集已存在，立即返回 `402002 SubsetNameConflict` 错误，不入队
+- `overwrite=true`：跳过名称唯一性校验，任务正常入队；执行完成时，先删除同名旧子集（级联删除其图像和存储文件），再创建新子集
+
+批量任务（`POST /api/pipelines/batch-run`）中，对每个输入子集独立生成 `output_subset_name`（由模板替换），独立校验名称唯一性。
 
 ### 5.2 管线感知服务
 
@@ -787,7 +833,7 @@ class ConnectionManager:
 | --- | --- | --- |
 | 400xxx | 认证与授权 | 400001 凭证无效、400002 令牌过期、400003 权限不足 |
 | 401xxx | 用户管理 | 401001 用户已存在、401002 用户不存在 |
-| 402xxx | 样本管理 | 402001 样本集不存在、402002 子集名称冲突 |
+| 402xxx | 样本管理 | 402001 样本集不存在、402002 子集名称冲突、402003 子集不存在 |
 | 403xxx | 样本库 | 403001 文件夹不存在、403002 文件夹非空、403003 循环引用、403004 已共享、403005 未共享、403006 名称重复 |
 | 404xxx | 管线与任务 | 404001 模块不存在、404002 模块不可用、404003 资源不足 |
 | 500xxx | 系统级 | 500000 内部错误（已有） |

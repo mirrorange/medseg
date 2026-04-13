@@ -31,6 +31,7 @@ class SampleSetRead(BaseModel):
 
 class SampleSetDetail(SampleSetRead):
     subsets: list["SubsetRead"] = []
+    is_shared: bool = False
 
 
 # --- Subset ---

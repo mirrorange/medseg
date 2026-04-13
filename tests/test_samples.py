@@ -198,3 +198,88 @@ async def test_image_rename_not_found(
         json={"filename": "new_name.nii.gz"},
     )
     assert resp.status_code == 404
+
+
+# --- Subset Name Uniqueness Tests ---
+
+
+@pytest.mark.asyncio
+async def test_create_duplicate_subset_name_returns_409(
+    client: AsyncClient, auth_headers, sample_set_id
+):
+    resp1 = await client.post(
+        f"/api/sample-sets/{sample_set_id}/subsets",
+        headers=auth_headers,
+        json={"name": "dup_name", "type": "raw"},
+    )
+    assert resp1.status_code == 201
+
+    resp2 = await client.post(
+        f"/api/sample-sets/{sample_set_id}/subsets",
+        headers=auth_headers,
+        json={"name": "dup_name", "type": "raw"},
+    )
+    assert resp2.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_rename_subset_to_existing_name_returns_409(
+    client: AsyncClient, auth_headers, sample_set_id
+):
+    resp1 = await client.post(
+        f"/api/sample-sets/{sample_set_id}/subsets",
+        headers=auth_headers,
+        json={"name": "first", "type": "raw"},
+    )
+    assert resp1.status_code == 201
+
+    resp2 = await client.post(
+        f"/api/sample-sets/{sample_set_id}/subsets",
+        headers=auth_headers,
+        json={"name": "second", "type": "raw"},
+    )
+    assert resp2.status_code == 201
+    second_id = resp2.json()["id"]
+
+    resp3 = await client.put(
+        f"/api/sample-sets/{sample_set_id}/subsets/{second_id}",
+        headers=auth_headers,
+        json={"name": "first"},
+    )
+    assert resp3.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_rename_subset_to_same_name_succeeds(
+    client: AsyncClient, auth_headers, sample_set_id
+):
+    resp = await client.post(
+        f"/api/sample-sets/{sample_set_id}/subsets",
+        headers=auth_headers,
+        json={"name": "keep_name", "type": "raw"},
+    )
+    assert resp.status_code == 201
+    subset_id = resp.json()["id"]
+
+    resp2 = await client.put(
+        f"/api/sample-sets/{sample_set_id}/subsets/{subset_id}",
+        headers=auth_headers,
+        json={"name": "keep_name"},
+    )
+    assert resp2.status_code == 200
+
+
+# --- is_shared field test ---
+
+
+@pytest.mark.asyncio
+async def test_sample_set_detail_includes_is_shared(
+    client: AsyncClient, auth_headers, sample_set_id
+):
+    resp = await client.get(
+        f"/api/sample-sets/{sample_set_id}", headers=auth_headers
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "is_shared" in data
+    assert data["is_shared"] is False

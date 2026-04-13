@@ -419,3 +419,44 @@ async def test_batch_run_with_invalid_subset(
     assert len(result["tasks"]) == 1
     assert len(result["errors"]) == 1
     assert result["errors"][0]["input_subset_id"] == fake_id
+
+
+@pytest.mark.asyncio
+async def test_submit_task_with_overwrite(client, auth_header, sample_set_with_subset):
+    """Test that TaskCreate accepts overwrite field."""
+    data = sample_set_with_subset
+    resp = await client.post(
+        "/api/pipelines/run",
+        json={
+            "module_name": "echo",
+            "sample_set_id": data["sample_set_id"],
+            "input_subset_id": data["subset_id"],
+            "output_subset_name": "echo_output",
+            "overwrite": True,
+        },
+        headers=auth_header,
+    )
+    assert resp.status_code == 201
+    task = resp.json()
+    assert task["overwrite"] is True
+
+
+@pytest.mark.asyncio
+async def test_submit_task_overwrite_defaults_false(
+    client, auth_header, sample_set_with_subset
+):
+    """Test that overwrite defaults to False."""
+    data = sample_set_with_subset
+    resp = await client.post(
+        "/api/pipelines/run",
+        json={
+            "module_name": "echo",
+            "sample_set_id": data["sample_set_id"],
+            "input_subset_id": data["subset_id"],
+            "output_subset_name": "echo_output",
+        },
+        headers=auth_header,
+    )
+    assert resp.status_code == 201
+    task = resp.json()
+    assert task["overwrite"] is False

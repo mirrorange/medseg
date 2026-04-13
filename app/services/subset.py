@@ -5,6 +5,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.exceptions import AppError
 from app.models.subset import Subset
+from app.services.sample_set import SubsetNameConflict
 
 
 class SubsetNotFound(AppError):
@@ -14,6 +15,23 @@ class SubsetNotFound(AppError):
             message_key="sample.subsetNotFound",
             status_code=404,
         )
+
+
+async def _check_subset_name_unique(
+    session: AsyncSession,
+    sample_set_id: uuid.UUID,
+    name: str,
+    exclude_subset_id: uuid.UUID | None = None,
+) -> None:
+    stmt = select(Subset).where(
+        Subset.sample_set_id == sample_set_id,
+        Subset.name == name,
+    )
+    if exclude_subset_id is not None:
+        stmt = stmt.where(Subset.id != exclude_subset_id)
+    result = await session.exec(stmt)
+    if result.first() is not None:
+        raise SubsetNameConflict()
 
 
 async def get_subset(
@@ -51,6 +69,7 @@ async def create_subset(
     name: str,
     type: str = "raw",
 ) -> Subset:
+    await _check_subset_name_unique(session, sample_set_id, name)
     subset = Subset(
         sample_set_id=sample_set_id,
         name=name,
@@ -69,6 +88,7 @@ async def update_subset(
     name: str | None = None,
 ) -> Subset:
     if name is not None:
+        await _check_subset_name_unique(session, subset.sample_set_id, name, exclude_subset_id=subset.id)
         subset.name = name
     session.add(subset)
     await session.commit()

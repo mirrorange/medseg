@@ -185,6 +185,7 @@ async def run_pipeline(
         input_subset_id=body.input_subset_id,
         output_subset_name=body.output_subset_name,
         params=body.params,
+        overwrite=body.overwrite,
     )
     return task
 
@@ -214,6 +215,7 @@ async def batch_run_pipeline(
         input_subset_ids=body.input_subset_ids,
         output_subset_name_template=body.output_subset_name_template,
         params=body.params,
+        overwrite=body.overwrite,
     )
     return BatchTaskResult(
         tasks=[TaskRead(**t) for t in tasks],

@@ -1,11 +1,13 @@
 import uuid
 
 from fastapi import APIRouter, Depends
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.dependencies import get_current_user
 from app.core.exceptions import PermissionDenied
 from app.db import get_session
+from app.models.share import Share
 from app.models.user import User, UserRole
 from app.schemas.sample import (
     SampleSetCreate,
@@ -59,6 +61,13 @@ async def get_detail(
     ss = await get_sample_set(session, sample_set_id)
     _check_owner_or_admin(ss.owner_id, user)
     subsets = await list_subsets(session, ss.id)
+
+    # Check if this sample set is shared
+    result = await session.exec(
+        select(Share).where(Share.sample_set_id == ss.id)
+    )
+    is_shared = result.first() is not None
+
     return SampleSetDetail(
         id=ss.id,
         name=ss.name,
@@ -68,6 +77,7 @@ async def get_detail(
         created_at=ss.created_at,
         updated_at=ss.updated_at,
         subsets=[SubsetRead.model_validate(s, from_attributes=True) for s in subsets],
+        is_shared=is_shared,
     )
 
 
