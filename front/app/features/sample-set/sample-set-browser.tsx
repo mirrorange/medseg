@@ -17,12 +17,10 @@ interface SampleSetBrowserProps {
   onCreateSubset: () => void;
   onUploadImages: () => void;
   onDeleteSelected: () => void;
-  onShare: () => void;
   onDeleteSampleSet: () => void;
   onRename: (item: SubsetRead | ImageRead) => void;
   onProperties: (item: SubsetRead | ImageRead) => void;
   onRunPipeline: (module: ModuleAwarenessItem, subsetIds: string[]) => void;
-  onPrimaryAction: () => void;
 }
 
 interface ContextMenuState {
@@ -37,12 +35,10 @@ export function SampleSetBrowser({
   onCreateSubset,
   onUploadImages,
   onDeleteSelected,
-  onShare,
   onDeleteSampleSet,
   onRename,
   onProperties,
   onRunPipeline,
-  onPrimaryAction,
 }: SampleSetBrowserProps) {
   const {
     level,
@@ -190,13 +186,10 @@ export function SampleSetBrowser({
     <div className="flex h-full flex-col rounded-lg border">
       <SampleSetToolbar
         sampleSetName={sampleSetName}
-        awareness={awareness}
         onCreateSubset={onCreateSubset}
         onUploadImages={onUploadImages}
         onDeleteSelected={onDeleteSelected}
-        onShare={onShare}
         onDeleteSampleSet={onDeleteSampleSet}
-        onPrimaryAction={onPrimaryAction}
       />
 
       <ScrollArea className="flex-1">

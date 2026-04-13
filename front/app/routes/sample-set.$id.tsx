@@ -7,10 +7,10 @@ import {
   deleteApiSampleSetsSampleSetIdDelete,
   deleteApiSampleSetsSampleSetIdSubsetsSubsetIdDelete,
   deleteApiSampleSetsSampleSetIdSubsetsSubsetIdImagesImageIdDelete,
-  publishSharedApiLibrarySharedSampleSetIdPost,
 } from "~/api";
 import type { SubsetRead, ImageRead, ModuleAwarenessItem } from "~/api/types.gen";
 import { SampleSetBrowser } from "~/features/sample-set/sample-set-browser";
+import { SampleSetHeader } from "~/features/sample-set/sample-set-header";
 import { CreateSubsetDialog } from "~/features/sample-set/create-subset-dialog";
 import { RenameDialog } from "~/features/sample-set/rename-dialog";
 import { PropertiesDialog } from "~/features/sample-set/properties-dialog";
@@ -66,13 +66,6 @@ export default function SampleSetDetailPage({
   // Properties
   const [propsOpen, setPropsOpen] = useState(false);
   const [propsItem, setPropsItem] = useState<SubsetRead | ImageRead | null>(null);
-
-  // Share
-  const handleShare = useCallback(() => {
-    publishSharedApiLibrarySharedSampleSetIdPost({
-      path: { sample_set_id: sampleSet.id },
-    }).then(() => toast.success("Sample set shared"));
-  }, [sampleSet.id]);
 
   // Delete sample set
   async function handleDeleteSampleSet() {
@@ -146,14 +139,6 @@ export default function SampleSetDetailPage({
     void useSampleSetStore.getState().refresh();
   }, []);
 
-  // Primary action button
-  const handlePrimaryAction = useCallback(() => {
-    const store = useSampleSetStore.getState();
-    const primary = store.awareness?.primary;
-    if (!primary) return;
-    handleRunPipeline(primary, primary.recommended_subset_ids);
-  }, [handleRunPipeline]);
-
   // Create subset
   const handleCreateSubset = useCallback(() => {
     setCreateSubsetOpen(true);
@@ -187,6 +172,8 @@ export default function SampleSetDetailPage({
   }, []);
 
   const storeLevel = useSampleSetStore((s) => s.level);
+  const storeAwareness = useSampleSetStore((s) => s.awareness);
+  const storeSampleSet = useSampleSetStore((s) => s.sampleSet);
   const currentSubsetId = useSampleSetStore((s) => s.currentSubsetId);
 
   const storeRefresh = useCallback(() => {
@@ -219,18 +206,22 @@ export default function SampleSetDetailPage({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      <SampleSetHeader
+        sampleSet={storeSampleSet ?? sampleSet}
+        awareness={storeAwareness}
+        onPrimaryAction={handleRunPipeline}
+        onUpdated={storeRefresh}
+      />
       <SampleSetBrowser
         sampleSetId={sampleSet.id}
         sampleSetName={sampleSet.name}
         onCreateSubset={handleCreateSubset}
         onUploadImages={handleUploadImages}
         onDeleteSelected={handleDeleteSelected}
-        onShare={handleShare}
         onDeleteSampleSet={() => setDeleteSSOpen(true)}
         onRename={handleRename}
         onProperties={handleProperties}
         onRunPipeline={handleRunPipeline}
-        onPrimaryAction={handlePrimaryAction}
       />
 
       {/* Dialogs */}

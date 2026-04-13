@@ -6,8 +6,6 @@ import {
   List,
   RefreshCw,
   Trash2,
-  Share2,
-  Sparkles,
 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import {
@@ -17,28 +15,21 @@ import {
 } from "~/components/ui/tooltip";
 import { Separator } from "~/components/ui/separator";
 import { useSampleSetStore, useCurrentSubsetName } from "~/stores/sample-set";
-import type { AwarenessResponse } from "~/api/types.gen";
 
 interface SampleSetToolbarProps {
   sampleSetName: string;
-  awareness: AwarenessResponse | null;
   onCreateSubset: () => void;
   onUploadImages: () => void;
   onDeleteSelected: () => void;
-  onShare: () => void;
   onDeleteSampleSet: () => void;
-  onPrimaryAction: () => void;
 }
 
 export function SampleSetToolbar({
   sampleSetName,
-  awareness,
   onCreateSubset,
   onUploadImages,
   onDeleteSelected,
-  onShare,
   onDeleteSampleSet,
-  onPrimaryAction,
 }: SampleSetToolbarProps) {
   const level = useSampleSetStore((s) => s.level);
   const isLoading = useSampleSetStore((s) => s.isLoading);
@@ -52,7 +43,6 @@ export function SampleSetToolbar({
   const isSubsets = level === "subsets";
   const isImages = level === "images";
   const hasSelection = selectedCount > 0;
-  const hasPrimary = isSubsets && !!awareness?.primary;
 
   return (
     <div className="flex h-10 items-center gap-1 border-b px-2">
@@ -108,27 +98,6 @@ export function SampleSetToolbar({
 
       <Separator orientation="vertical" className="mx-1 h-5" />
 
-      {/* Primary action - always rendered, hidden when not applicable */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="default"
-            size="sm"
-            className="h-7 gap-1 px-2 text-xs"
-            hidden={!hasPrimary}
-            onClick={onPrimaryAction}
-          >
-            <Sparkles className="size-3.5" />
-            {awareness?.primary?.module_name ?? "Run"}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side="bottom">
-          {hasPrimary
-            ? `Run ${awareness!.primary!.module_name} on ${awareness!.primary!.recommended_subset_ids.length} recommended subset(s)`
-            : "No primary action"}
-        </TooltipContent>
-      </Tooltip>
-
       {/* New Subset (subsets level only) */}
       <Tooltip>
         <TooltipTrigger asChild>
@@ -137,16 +106,6 @@ export function SampleSetToolbar({
           </Button>
         </TooltipTrigger>
         <TooltipContent side="bottom">New Subset</TooltipContent>
-      </Tooltip>
-
-      {/* Share (subsets level only) */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="ghost" size="icon" className="size-7" hidden={!isSubsets} onClick={onShare}>
-            <Share2 className="size-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side="bottom">Share</TooltipContent>
       </Tooltip>
 
       {/* Upload (images level only) */}
