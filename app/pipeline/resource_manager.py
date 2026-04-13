@@ -1,6 +1,11 @@
 """Resource Manager — track loaded modules, enforce thresholds, eviction."""
 
+import ctypes
 import logging
+import os
+import subprocess
+import sys
+from pathlib import Path
 
 from app.pipeline.interface import PipelineModule
 
@@ -11,18 +16,136 @@ class InsufficientResources(Exception):
     """Raised when resources are insufficient even after eviction."""
 
 
+def detect_total_ram_mb() -> int:
+    """Best-effort system RAM detection in MB."""
+    detectors = (
+        _detect_ram_via_sysconf,
+        _detect_ram_via_proc_meminfo,
+        _detect_ram_via_sysctl,
+        _detect_ram_via_windows_api,
+    )
+    for detector in detectors:
+        total_ram_mb = detector()
+        if total_ram_mb > 0:
+            return total_ram_mb
+    return 0
+
+
+def detect_total_vram_mb() -> int:
+    """Best-effort GPU VRAM detection in MB."""
+    try:
+        import torch
+    except ImportError:
+        return 0
+
+    try:
+        if not torch.cuda.is_available():
+            return 0
+        total_bytes = sum(
+            torch.cuda.get_device_properties(index).total_memory
+            for index in range(torch.cuda.device_count())
+        )
+    except Exception:
+        logger.exception("Failed to detect total VRAM")
+        return 0
+
+    return total_bytes // (1024 * 1024)
+
+
+def _detect_ram_via_sysconf() -> int:
+    if not hasattr(os, "sysconf"):
+        return 0
+
+    try:
+        page_size = os.sysconf("SC_PAGE_SIZE")
+        phys_pages = os.sysconf("SC_PHYS_PAGES")
+    except (AttributeError, OSError, ValueError):
+        return 0
+
+    if page_size <= 0 or phys_pages <= 0:
+        return 0
+
+    return (page_size * phys_pages) // (1024 * 1024)
+
+
+def _detect_ram_via_proc_meminfo() -> int:
+    meminfo_path = Path("/proc/meminfo")
+    if not meminfo_path.exists():
+        return 0
+
+    try:
+        for line in meminfo_path.read_text().splitlines():
+            if line.startswith("MemTotal:"):
+                parts = line.split()
+                if len(parts) >= 2:
+                    return int(parts[1]) // 1024
+    except (OSError, ValueError):
+        return 0
+
+    return 0
+
+
+def _detect_ram_via_sysctl() -> int:
+    if sys.platform != "darwin":
+        return 0
+
+    try:
+        output = subprocess.check_output(
+            ["sysctl", "-n", "hw.memsize"],
+            text=True,
+        ).strip()
+        return int(output) // (1024 * 1024)
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return 0
+
+
+def _detect_ram_via_windows_api() -> int:
+    if sys.platform != "win32":
+        return 0
+
+    class MEMORYSTATUSEX(ctypes.Structure):
+        _fields_ = [
+            ("dwLength", ctypes.c_ulong),
+            ("dwMemoryLoad", ctypes.c_ulong),
+            ("ullTotalPhys", ctypes.c_ulonglong),
+            ("ullAvailPhys", ctypes.c_ulonglong),
+            ("ullTotalPageFile", ctypes.c_ulonglong),
+            ("ullAvailPageFile", ctypes.c_ulonglong),
+            ("ullTotalVirtual", ctypes.c_ulonglong),
+            ("ullAvailVirtual", ctypes.c_ulonglong),
+            ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+        ]
+
+    status = MEMORYSTATUSEX()
+    status.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+
+    try:
+        success = ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status))
+    except AttributeError:
+        return 0
+
+    if not success:
+        return 0
+
+    return status.ullTotalPhys // (1024 * 1024)
+
+
 class ResourceManager:
     """Track resource usage and manage module loading/unloading."""
 
     def __init__(
         self,
         *,
-        total_ram_mb: int = 0,
-        total_vram_mb: int = 0,
+        total_ram_mb: int | None = None,
+        total_vram_mb: int | None = None,
         threshold_ratio: float = 0.8,
     ) -> None:
-        self.total_ram_mb = total_ram_mb
-        self.total_vram_mb = total_vram_mb
+        self.total_ram_mb = (
+            detect_total_ram_mb() if total_ram_mb is None else total_ram_mb
+        )
+        self.total_vram_mb = (
+            detect_total_vram_mb() if total_vram_mb is None else total_vram_mb
+        )
         self.threshold_ratio = threshold_ratio
 
         # {module_name: PipelineModule} — currently loaded
@@ -154,7 +277,7 @@ class ResourceManager:
             "threshold_ratio": self.threshold_ratio,
             "used_ram_mb": self.used_ram_mb,
             "used_vram_mb": self.used_vram_mb,
-            "available_ram_mb": max(0, self.ram_threshold - self.used_ram_mb),
-            "available_vram_mb": max(0, self.vram_threshold - self.used_vram_mb),
+            "available_ram_mb": int(max(0, self.ram_threshold - self.used_ram_mb)),
+            "available_vram_mb": int(max(0, self.vram_threshold - self.used_vram_mb)),
             "loaded_modules": list(self._loaded.keys()),
         }

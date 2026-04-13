@@ -309,3 +309,19 @@ def test_resource_manager_status():
     assert status["total_vram_mb"] == 8000
     assert status["used_ram_mb"] == 0
     assert status["loaded_modules"] == []
+
+
+def test_resource_manager_auto_detects_totals(monkeypatch):
+    monkeypatch.setattr(
+        "app.pipeline.resource_manager.detect_total_ram_mb",
+        lambda: 16384,
+    )
+    monkeypatch.setattr(
+        "app.pipeline.resource_manager.detect_total_vram_mb",
+        lambda: 4096,
+    )
+
+    rm = ResourceManager()
+
+    assert rm.total_ram_mb == 16384
+    assert rm.total_vram_mb == 4096
