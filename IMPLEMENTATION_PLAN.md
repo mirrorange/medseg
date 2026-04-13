@@ -12,7 +12,7 @@
 **Goal**: 新增批量提交处理任务接口
 **Success Criteria**: `POST /api/pipelines/batch-run` 可为多个子集创建独立任务；测试通过
 **Tests**: test_batch_run_pipeline, test_batch_run_empty_list
-**Status**: Not Started
+**Status**: Complete
 
 ## Stage 3: Frontend — Store + 浏览器骨架
 **Goal**: 创建 SampleSet Store (Zustand) 和浏览器骨架组件

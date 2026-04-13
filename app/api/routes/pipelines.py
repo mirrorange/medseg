@@ -13,10 +13,16 @@ from app.schemas.pipeline import (
     ModuleInfoRead,
     ResourceStatusRead,
 )
-from app.schemas.task import TaskCreate, TaskRead
+from app.schemas.task import (
+    BatchTaskCreate,
+    BatchTaskError,
+    BatchTaskResult,
+    TaskCreate,
+    TaskRead,
+)
 from app.services.pipeline import check_awareness
 from app.services.sample_set import get_sample_set
-from app.services.task import submit_task
+from app.services.task import submit_batch_tasks, submit_task
 
 router = APIRouter(prefix="/pipelines", tags=["pipelines"])
 
@@ -181,3 +187,35 @@ async def run_pipeline(
         params=body.params,
     )
     return task
+
+
+# --------------- Batch Run (submit multiple tasks) ---------------
+
+
+@router.post("/batch-run", response_model=BatchTaskResult, status_code=201)
+async def batch_run_pipeline(
+    body: BatchTaskCreate,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Submit one processing task per input subset."""
+    from app.core.exceptions import PermissionDenied
+    from app.models.user import UserRole
+
+    ss = await get_sample_set(session, body.sample_set_id)
+    if ss.owner_id != user.id and user.role != UserRole.admin:
+        raise PermissionDenied()
+
+    tasks, errors = await submit_batch_tasks(
+        session,
+        user_id=user.id,
+        module_name=body.module_name,
+        sample_set_id=body.sample_set_id,
+        input_subset_ids=body.input_subset_ids,
+        output_subset_name_template=body.output_subset_name_template,
+        params=body.params,
+    )
+    return BatchTaskResult(
+        tasks=[TaskRead(**t) for t in tasks],
+        errors=[BatchTaskError(**e) for e in errors],
+    )

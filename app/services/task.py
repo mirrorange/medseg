@@ -87,3 +87,69 @@ async def cancel_task(session: AsyncSession, task: Task) -> Task:
     await session.commit()
     await session.refresh(task)
     return task
+
+
+async def submit_batch_tasks(
+    session: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    module_name: str,
+    sample_set_id: uuid.UUID,
+    input_subset_ids: list[uuid.UUID],
+    output_subset_name_template: str,
+    params: dict | None = None,
+) -> tuple[list[dict], list[dict]]:
+    """Submit one task per input subset. Returns (task_dicts, errors).
+
+    task_dicts are plain dicts (serialized from Task) to avoid lazy-loading
+    issues outside the session scope.
+    """
+    from app.services.subset import get_subset
+
+    tasks: list[dict] = []
+    errors: list[dict] = []
+
+    for subset_id in input_subset_ids:
+        try:
+            subset = await get_subset(session, subset_id)
+            output_name = output_subset_name_template.format(
+                input_name=subset.name,
+                module=module_name,
+            )
+            task = await submit_task(
+                session,
+                user_id=user_id,
+                module_name=module_name,
+                sample_set_id=sample_set_id,
+                input_subset_id=subset_id,
+                output_subset_name=output_name,
+                params=params,
+            )
+            # Convert to dict while session is still active
+            tasks.append({
+                "id": task.id,
+                "user_id": task.user_id,
+                "module_name": task.module_name,
+                "sample_set_id": task.sample_set_id,
+                "input_subset_id": task.input_subset_id,
+                "output_subset_name": task.output_subset_name,
+                "params": task.params,
+                "status": task.status,
+                "error_message": task.error_message,
+                "retry_count": task.retry_count,
+                "created_at": task.created_at,
+                "started_at": task.started_at,
+                "completed_at": task.completed_at,
+            })
+        except Exception as e:
+            error_code = getattr(e, "error_code", 500000)
+            message = getattr(e, "message_key", str(e))
+            errors.append(
+                {
+                    "input_subset_id": subset_id,
+                    "error_code": error_code,
+                    "message": message,
+                }
+            )
+
+    return tasks, errors

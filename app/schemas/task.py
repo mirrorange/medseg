@@ -29,3 +29,22 @@ class TaskRead(BaseModel):
     created_at: datetime
     started_at: datetime | None
     completed_at: datetime | None
+
+
+class BatchTaskCreate(BaseModel):
+    module_name: str
+    sample_set_id: uuid.UUID
+    input_subset_ids: list[uuid.UUID]
+    output_subset_name_template: str = "{input_name}_{module}"
+    params: dict[str, Any] | None = None
+
+
+class BatchTaskError(BaseModel):
+    input_subset_id: uuid.UUID
+    error_code: int
+    message: str
+
+
+class BatchTaskResult(BaseModel):
+    tasks: list[TaskRead]
+    errors: list[BatchTaskError]

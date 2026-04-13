@@ -313,3 +313,109 @@ async def test_task_not_found(client, auth_header):
     """Test getting a non-existent task returns 404."""
     resp = await client.get(f"/api/tasks/{uuid.uuid4()}", headers=auth_header)
     assert resp.status_code == 404
+
+
+# --------------- Batch Run Tests ---------------
+
+
+@pytest.fixture
+async def sample_set_with_two_subsets(client, auth_header, session):
+    """Create a sample set with two subsets for batch testing."""
+    from app.models.subset import Subset
+
+    resp = await client.post(
+        "/api/sample-sets",
+        json={"name": "Batch Test Set"},
+        headers=auth_header,
+    )
+    ss_id = resp.json()["id"]
+
+    subset_a = Subset(
+        sample_set_id=uuid.UUID(ss_id),
+        name="raw_a",
+        type="raw",
+        metadata_={},
+    )
+    subset_b = Subset(
+        sample_set_id=uuid.UUID(ss_id),
+        name="raw_b",
+        type="raw",
+        metadata_={},
+    )
+    session.add(subset_a)
+    session.add(subset_b)
+    await session.commit()
+    await session.refresh(subset_a)
+    await session.refresh(subset_b)
+
+    return {
+        "sample_set_id": ss_id,
+        "subset_ids": [str(subset_a.id), str(subset_b.id)],
+    }
+
+
+@pytest.mark.asyncio
+async def test_batch_run_pipeline(client, auth_header, sample_set_with_two_subsets):
+    """Test batch submitting tasks for multiple subsets."""
+    data = sample_set_with_two_subsets
+    resp = await client.post(
+        "/api/pipelines/batch-run",
+        json={
+            "module_name": "echo",
+            "sample_set_id": data["sample_set_id"],
+            "input_subset_ids": data["subset_ids"],
+            "output_subset_name_template": "{input_name}_echo",
+        },
+        headers=auth_header,
+    )
+    assert resp.status_code == 201
+    result = resp.json()
+    assert len(result["tasks"]) == 2
+    assert len(result["errors"]) == 0
+    # Verify each task has correct output name based on template
+    output_names = {t["output_subset_name"] for t in result["tasks"]}
+    assert "raw_a_echo" in output_names
+    assert "raw_b_echo" in output_names
+
+
+@pytest.mark.asyncio
+async def test_batch_run_empty_list(client, auth_header, sample_set_with_two_subsets):
+    """Test batch-run with empty input_subset_ids returns empty result."""
+    data = sample_set_with_two_subsets
+    resp = await client.post(
+        "/api/pipelines/batch-run",
+        json={
+            "module_name": "echo",
+            "sample_set_id": data["sample_set_id"],
+            "input_subset_ids": [],
+        },
+        headers=auth_header,
+    )
+    assert resp.status_code == 201
+    result = resp.json()
+    assert len(result["tasks"]) == 0
+    assert len(result["errors"]) == 0
+
+
+@pytest.mark.asyncio
+async def test_batch_run_with_invalid_subset(
+    client, auth_header, sample_set_with_two_subsets
+):
+    """Test batch-run with a non-existent subset ID records error without failing."""
+    data = sample_set_with_two_subsets
+    fake_id = str(uuid.uuid4())
+    resp = await client.post(
+        "/api/pipelines/batch-run",
+        json={
+            "module_name": "echo",
+            "sample_set_id": data["sample_set_id"],
+            "input_subset_ids": [data["subset_ids"][0], fake_id],
+            "output_subset_name_template": "{input_name}_echo",
+        },
+        headers=auth_header,
+    )
+    assert resp.status_code == 201
+    result = resp.json()
+    assert len(result["tasks"]) == 1
+    assert len(result["errors"]) == 1
+    assert result["errors"][0]["input_subset_id"] == fake_id
