@@ -125,8 +125,7 @@ front/
 │   │   │   └── cornerstone-init.ts       # Cornerstone3D 初始化逻辑
 │   │   │
 │   │   ├── tasks/                      # 任务模块
-│   │   │   ├── task-list.tsx           # 任务列表
-│   │   │   ├── task-card.tsx           # 任务状态卡片
+│   │   │   ├── task-list.tsx           # 任务数据表格（表格视图，含状态徽标、关联名称、操作列）
 │   │   │   └── task-progress.tsx       # 进度指示器
 │   │   │
 │   │   └── admin/                      # 管理后台模块

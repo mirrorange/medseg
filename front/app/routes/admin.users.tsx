@@ -5,8 +5,9 @@ import {
   getUsersApiUsersGet,
   adminUpdateApiUsersUserIdPut,
   adminDeleteApiUsersUserIdDelete,
+  createUserApiUsersPost,
 } from "~/api";
-import type { UserRead, AdminUserUpdate } from "~/api/types.gen";
+import type { UserRead, AdminUserUpdate, AdminUserCreate } from "~/api/types.gen";
 import {
   Table,
   TableBody,
@@ -45,7 +46,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Switch } from "~/components/ui/switch";
 import { toast } from "sonner";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, Plus } from "lucide-react";
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: "User Management - MedSeg Cloud" }];
@@ -62,6 +63,26 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
   const [editUser, setEditUser] = useState<UserRead | null>(null);
   const [deleteUser, setDeleteUser] = useState<UserRead | null>(null);
   const [editForm, setEditForm] = useState<AdminUserUpdate>({});
+  const [showCreate, setShowCreate] = useState(false);
+  const [createForm, setCreateForm] = useState<AdminUserCreate>({
+    username: "",
+    email: "",
+    password: "",
+    role: "user",
+    is_active: true,
+  });
+
+  const handleCreate = useCallback(async () => {
+    try {
+      await createUserApiUsersPost({ body: createForm });
+      toast.success("User created");
+      setShowCreate(false);
+      setCreateForm({ username: "", email: "", password: "", role: "user", is_active: true });
+      revalidator.revalidate();
+    } catch {
+      toast.error("Failed to create user");
+    }
+  }, [createForm, revalidator]);
 
   const openEdit = useCallback((user: UserRead) => {
     setEditUser(user);
@@ -104,11 +125,17 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">User Management</h1>
-        <p className="mt-1 text-muted-foreground">
-          Manage user accounts, roles, and active status.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">User Management</h1>
+          <p className="mt-1 text-muted-foreground">
+            Manage user accounts, roles, and active status.
+          </p>
+        </div>
+        <Button onClick={() => setShowCreate(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Create User
+        </Button>
       </div>
 
       <div className="rounded-md border">
@@ -160,6 +187,85 @@ export default function AdminUsersPage({ loaderData }: Route.ComponentProps) {
           </TableBody>
         </Table>
       </div>
+
+      {/* Create Dialog */}
+      <Dialog open={showCreate} onOpenChange={(open) => {
+        if (!open) {
+          setShowCreate(false);
+          setCreateForm({ username: "", email: "", password: "", role: "user", is_active: true });
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create User</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="create-username">Username</Label>
+              <Input
+                id="create-username"
+                value={createForm.username}
+                onChange={(e) =>
+                  setCreateForm((f) => ({ ...f, username: e.target.value }))
+                }
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="create-email">Email</Label>
+              <Input
+                id="create-email"
+                type="email"
+                value={createForm.email}
+                onChange={(e) =>
+                  setCreateForm((f) => ({ ...f, email: e.target.value }))
+                }
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="create-password">Password</Label>
+              <Input
+                id="create-password"
+                type="password"
+                value={createForm.password}
+                onChange={(e) =>
+                  setCreateForm((f) => ({ ...f, password: e.target.value }))
+                }
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Role</Label>
+              <Select
+                value={createForm.role}
+                onValueChange={(v) => setCreateForm((f) => ({ ...f, role: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="user">User</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                id="create-active"
+                checked={createForm.is_active}
+                onCheckedChange={(v) =>
+                  setCreateForm((f) => ({ ...f, is_active: v }))
+                }
+              />
+              <Label htmlFor="create-active">Active</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreate(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreate}>Create</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Dialog */}
       <Dialog open={!!editUser} onOpenChange={(open) => !open && setEditUser(null)}>

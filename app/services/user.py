@@ -5,6 +5,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.exceptions import UserAlreadyExists, UserNotFound
+from app.core.security import hash_password
 from app.models.user import User, UserRole
 
 
@@ -75,3 +76,30 @@ async def delete_user(session: AsyncSession, user_id: uuid.UUID) -> None:
     user = await get_user_by_id(session, user_id)
     await session.delete(user)
     await session.commit()
+
+
+async def admin_create_user(
+    session: AsyncSession,
+    username: str,
+    email: str,
+    password: str,
+    role: str = "user",
+    is_active: bool = True,
+) -> User:
+    result = await session.exec(
+        select(User).where((User.username == username) | (User.email == email))
+    )
+    if result.first() is not None:
+        raise UserAlreadyExists()
+
+    user = User(
+        username=username,
+        email=email,
+        hashed_password=hash_password(password),
+        role=UserRole(role),
+        is_active=is_active,
+    )
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+    return user

@@ -128,3 +128,67 @@ async def test_admin_stats(client, admin_header):
 async def test_non_admin_cannot_access_stats(client, regular_header):
     resp = await client.get("/api/admin/stats", headers=regular_header)
     assert resp.status_code == 403
+
+
+# --------------- Admin Create User ---------------
+
+
+@pytest.mark.asyncio
+async def test_admin_create_user(client, admin_header):
+    """Admin can create a new user."""
+    resp = await client.post(
+        "/api/users",
+        json={
+            "username": "newuser",
+            "email": "newuser@test.com",
+            "password": "securePass1",
+            "role": "user",
+            "is_active": True,
+        },
+        headers=admin_header,
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["username"] == "newuser"
+    assert data["email"] == "newuser@test.com"
+    assert data["role"] == "user"
+    assert data["is_active"] is True
+
+
+@pytest.mark.asyncio
+async def test_admin_create_user_duplicate_username(client, admin_header):
+    """Cannot create a user with duplicate username."""
+    await client.post(
+        "/api/users",
+        json={
+            "username": "dupuser",
+            "email": "dup1@test.com",
+            "password": "pass123",
+        },
+        headers=admin_header,
+    )
+    resp = await client.post(
+        "/api/users",
+        json={
+            "username": "dupuser",
+            "email": "dup2@test.com",
+            "password": "pass123",
+        },
+        headers=admin_header,
+    )
+    assert resp.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_non_admin_cannot_create_user(client, regular_header):
+    """Regular user cannot create users."""
+    resp = await client.post(
+        "/api/users",
+        json={
+            "username": "hackeduser",
+            "email": "hack@test.com",
+            "password": "pass123",
+        },
+        headers=regular_header,
+    )
+    assert resp.status_code == 403

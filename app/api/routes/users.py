@@ -6,8 +6,9 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.api.dependencies import get_current_user, require_admin
 from app.db import get_session
 from app.models.user import User
-from app.schemas.user import AdminUserUpdate, UserRead, UserUpdate
+from app.schemas.user import AdminUserCreate, AdminUserUpdate, UserRead, UserUpdate
 from app.services.user import (
+    admin_create_user,
     admin_update_user,
     delete_user,
     list_users,
@@ -37,6 +38,22 @@ async def get_users(
     session: AsyncSession = Depends(get_session),
 ):
     return await list_users(session)
+
+
+@router.post("", response_model=UserRead, status_code=201)
+async def create_user(
+    body: AdminUserCreate,
+    _admin: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+):
+    return await admin_create_user(
+        session,
+        username=body.username,
+        email=body.email,
+        password=body.password,
+        role=body.role,
+        is_active=body.is_active,
+    )
 
 
 @router.put("/{user_id}", response_model=UserRead)

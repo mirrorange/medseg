@@ -350,6 +350,7 @@ async def require_owner(resource_owner_id: UUID, user: User = Depends(get_curren
 | GET | `/api/users/me` | 获取当前用户信息 | 已认证 |
 | PUT | `/api/users/me` | 更新当前用户信息 | 已认证 |
 | GET | `/api/users` | 用户列表 | 管理员 |
+| POST | `/api/users` | 创建用户（设置用户名、密码、角色） | 管理员 |
 | PUT | `/api/users/{user_id}` | 更新用户（角色等） | 管理员 |
 | DELETE | `/api/users/{user_id}` | 删除用户 | 管理员 |
 
@@ -366,7 +367,7 @@ async def require_owner(resource_owner_id: UUID, user: User = Depends(get_curren
 | PUT | `/api/library/folders/{folder_id}` | 重命名/移动文件夹 | 所有者 |
 | DELETE | `/api/library/folders/{folder_id}` | 删除文件夹 | 所有者 |
 | POST | `/api/library/batch-move` | 批量移动文件夹/样本集到目标目录 | 所有者 |
-| GET | `/api/library/shared` | 浏览共享样本库 | 已认证 |
+| GET | `/api/library/shared` | 浏览共享样本库（支持 `?search=` 模糊搜索名称/描述） | 已认证 |
 | POST | `/api/library/shared/{sample_set_id}` | 发布到共享库 | 所有者 |
 | DELETE | `/api/library/shared/{sample_set_id}` | 撤回共享 | 所有者 |
 | POST | `/api/library/shared/{sample_set_id}/copy` | 复制到个人库 | 已认证 |
@@ -457,9 +458,11 @@ async def require_owner(resource_owner_id: UUID, user: User = Depends(get_curren
 
 | 方法 | 路径 | 说明 | 权限 |
 | --- | --- | --- | --- |
-| GET | `/api/tasks` | 当前用户任务列表 | 已认证 |
+| GET | `/api/tasks` | 当前用户任务列表（返回含样本集名/子集名的丰富信息） | 已认证 |
 | GET | `/api/tasks/{id}` | 任务详情（状态、位置、时间） | 所有者/管理员 |
-| DELETE | `/api/tasks/{id}` | 取消排队中的任务 | 所有者 |
+| POST | `/api/tasks/{id}/cancel` | 取消排队中的任务 | 所有者 |
+| DELETE | `/api/tasks/{id}` | 删除已完成/失败/已取消的任务记录 | 所有者 |
+| DELETE | `/api/tasks/history` | 批量清空已完成/失败/已取消的任务历史 | 已认证 |
 | GET | `/api/tasks/all` | 所有用户任务列表 | 管理员 |
 
 #### WebSocket (`/api/ws`)
@@ -472,7 +475,7 @@ async def require_owner(resource_owner_id: UUID, user: User = Depends(get_curren
 
 | 方法 | 路径 | 说明 | 权限 |
 | --- | --- | --- | --- |
-| GET | `/api/admin/sample-sets` | 查看所有用户的样本集 | 管理员 |
+| GET | `/api/admin/sample-sets` | 查看所有用户的样本集（含 owner_username，支持 `?search=` 和 `?owner_id=` 筛选） | 管理员 |
 | DELETE | `/api/admin/shared/{sample_set_id}` | 移除共享样本集 | 管理员 |
 | GET | `/api/admin/stats` | 存储使用量统计 | 管理员 |
 

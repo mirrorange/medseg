@@ -5,6 +5,32 @@ export type ClientOptions = {
 };
 
 /**
+ * AdminUserCreate
+ */
+export type AdminUserCreate = {
+    /**
+     * Username
+     */
+    username: string;
+    /**
+     * Email
+     */
+    email: string;
+    /**
+     * Password
+     */
+    password: string;
+    /**
+     * Role
+     */
+    role?: string;
+    /**
+     * Is Active
+     */
+    is_active?: boolean;
+};
+
+/**
  * AdminUserUpdate
  */
 export type AdminUserUpdate = {
@@ -1073,6 +1099,31 @@ export type GetUsersApiUsersGetResponses = {
 };
 
 export type GetUsersApiUsersGetResponse = GetUsersApiUsersGetResponses[keyof GetUsersApiUsersGetResponses];
+
+export type CreateUserApiUsersPostData = {
+    body: AdminUserCreate;
+    path?: never;
+    query?: never;
+    url: '/api/users';
+};
+
+export type CreateUserApiUsersPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateUserApiUsersPostError = CreateUserApiUsersPostErrors[keyof CreateUserApiUsersPostErrors];
+
+export type CreateUserApiUsersPostResponses = {
+    /**
+     * Successful Response
+     */
+    201: UserRead;
+};
+
+export type CreateUserApiUsersPostResponse = CreateUserApiUsersPostResponses[keyof CreateUserApiUsersPostResponses];
 
 export type AdminDeleteApiUsersUserIdDeleteData = {
     body?: never;
