@@ -191,6 +191,9 @@ export default function SampleSetDetailPage({
     setPropsOpen(true);
   }, []);
 
+  const storeLevel = useSampleSetStore((s) => s.level);
+  const currentSubsetId = useSampleSetStore((s) => s.currentSubsetId);
+
   const storeRefresh = useCallback(() => {
     void useSampleSetStore.getState().refresh();
   }, []);
@@ -252,14 +255,14 @@ export default function SampleSetDetailPage({
         open={propsOpen}
         onOpenChange={setPropsOpen}
         item={propsItem}
-        level={useSampleSetStore.getState().level}
+        level={storeLevel}
       />
-      {useSampleSetStore.getState().currentSubsetId && (
+      {currentSubsetId && (
         <ImageUploadDialog
           open={uploadOpen}
           onOpenChange={setUploadOpen}
           sampleSetId={sampleSet.id}
-          subsetId={useSampleSetStore.getState().currentSubsetId!}
+          subsetId={currentSubsetId}
           onUploaded={storeRefresh}
         />
       )}
