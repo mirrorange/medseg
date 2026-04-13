@@ -844,6 +844,14 @@ export type TaskRead = {
      * Completed At
      */
     completed_at: string | null;
+    /**
+     * Sample Set Name
+     */
+    sample_set_name?: string | null;
+    /**
+     * Input Subset Name
+     */
+    input_subset_name?: string | null;
 };
 
 /**
@@ -2306,7 +2314,21 @@ export type ListAllApiTasksAllGetResponses = {
 
 export type ListAllApiTasksAllGetResponse = ListAllApiTasksAllGetResponses[keyof ListAllApiTasksAllGetResponses];
 
-export type CancelTaskEndpointApiTasksTaskIdDeleteData = {
+export type ClearHistoryApiTasksHistoryDeleteData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/tasks/history';
+};
+
+export type ClearHistoryApiTasksHistoryDeleteResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type DeleteTaskEndpointApiTasksTaskIdDeleteData = {
     body?: never;
     path: {
         /**
@@ -2318,23 +2340,23 @@ export type CancelTaskEndpointApiTasksTaskIdDeleteData = {
     url: '/api/tasks/{task_id}';
 };
 
-export type CancelTaskEndpointApiTasksTaskIdDeleteErrors = {
+export type DeleteTaskEndpointApiTasksTaskIdDeleteErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type CancelTaskEndpointApiTasksTaskIdDeleteError = CancelTaskEndpointApiTasksTaskIdDeleteErrors[keyof CancelTaskEndpointApiTasksTaskIdDeleteErrors];
+export type DeleteTaskEndpointApiTasksTaskIdDeleteError = DeleteTaskEndpointApiTasksTaskIdDeleteErrors[keyof DeleteTaskEndpointApiTasksTaskIdDeleteErrors];
 
-export type CancelTaskEndpointApiTasksTaskIdDeleteResponses = {
+export type DeleteTaskEndpointApiTasksTaskIdDeleteResponses = {
     /**
      * Successful Response
      */
-    200: TaskRead;
+    204: void;
 };
 
-export type CancelTaskEndpointApiTasksTaskIdDeleteResponse = CancelTaskEndpointApiTasksTaskIdDeleteResponses[keyof CancelTaskEndpointApiTasksTaskIdDeleteResponses];
+export type DeleteTaskEndpointApiTasksTaskIdDeleteResponse = DeleteTaskEndpointApiTasksTaskIdDeleteResponses[keyof DeleteTaskEndpointApiTasksTaskIdDeleteResponses];
 
 export type GetTaskDetailApiTasksTaskIdGetData = {
     body?: never;
@@ -2365,6 +2387,36 @@ export type GetTaskDetailApiTasksTaskIdGetResponses = {
 };
 
 export type GetTaskDetailApiTasksTaskIdGetResponse = GetTaskDetailApiTasksTaskIdGetResponses[keyof GetTaskDetailApiTasksTaskIdGetResponses];
+
+export type CancelTaskEndpointApiTasksTaskIdCancelPostData = {
+    body?: never;
+    path: {
+        /**
+         * Task Id
+         */
+        task_id: string;
+    };
+    query?: never;
+    url: '/api/tasks/{task_id}/cancel';
+};
+
+export type CancelTaskEndpointApiTasksTaskIdCancelPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CancelTaskEndpointApiTasksTaskIdCancelPostError = CancelTaskEndpointApiTasksTaskIdCancelPostErrors[keyof CancelTaskEndpointApiTasksTaskIdCancelPostErrors];
+
+export type CancelTaskEndpointApiTasksTaskIdCancelPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: TaskRead;
+};
+
+export type CancelTaskEndpointApiTasksTaskIdCancelPostResponse = CancelTaskEndpointApiTasksTaskIdCancelPostResponses[keyof CancelTaskEndpointApiTasksTaskIdCancelPostResponses];
 
 export type ListAllSampleSetsApiAdminSampleSetsGetData = {
     body?: never;

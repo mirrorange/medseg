@@ -31,6 +31,8 @@ class TaskRead(BaseModel):
     created_at: datetime
     started_at: datetime | None
     completed_at: datetime | None
+    sample_set_name: str | None = None
+    input_subset_name: str | None = None
 
 
 class BatchTaskCreate(BaseModel):

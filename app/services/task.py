@@ -6,8 +6,34 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.exceptions import ModuleNotAvailable, TaskNotCancellable, TaskNotFound
+from app.models.sample_set import SampleSet
+from app.models.subset import Subset
 from app.models.task import Task, TaskStatus
+from app.schemas.task import TaskRead
 from app.services.sample_set import SubsetNameConflict
+
+_FINISHED_STATUSES = [TaskStatus.completed, TaskStatus.failed, TaskStatus.cancelled]
+
+
+def _task_to_read(task: Task, sample_set_name: str | None, input_subset_name: str | None) -> TaskRead:
+    return TaskRead(
+        id=task.id,
+        user_id=task.user_id,
+        module_name=task.module_name,
+        sample_set_id=task.sample_set_id,
+        input_subset_id=task.input_subset_id,
+        output_subset_name=task.output_subset_name,
+        params=task.params,
+        overwrite=task.overwrite,
+        status=task.status,
+        error_message=task.error_message,
+        retry_count=task.retry_count,
+        created_at=task.created_at,
+        started_at=task.started_at,
+        completed_at=task.completed_at,
+        sample_set_name=sample_set_name,
+        input_subset_name=input_subset_name,
+    )
 
 
 async def _check_pending_task_name_conflict(
@@ -89,16 +115,25 @@ async def get_task(session: AsyncSession, task_id: uuid.UUID) -> Task:
     return task
 
 
-async def list_user_tasks(session: AsyncSession, user_id: uuid.UUID) -> list[Task]:
+async def list_user_tasks(session: AsyncSession, user_id: uuid.UUID) -> list[TaskRead]:
     result = await session.exec(
-        select(Task).where(Task.user_id == user_id).order_by(Task.created_at.desc())
+        select(Task, SampleSet.name, Subset.name)
+        .outerjoin(SampleSet, Task.sample_set_id == SampleSet.id)
+        .outerjoin(Subset, Task.input_subset_id == Subset.id)
+        .where(Task.user_id == user_id)
+        .order_by(Task.created_at.desc())
     )
-    return list(result.all())
+    return [_task_to_read(task, ss_name, sub_name) for task, ss_name, sub_name in result.all()]
 
 
-async def list_all_tasks(session: AsyncSession) -> list[Task]:
-    result = await session.exec(select(Task).order_by(Task.created_at.desc()))
-    return list(result.all())
+async def list_all_tasks(session: AsyncSession) -> list[TaskRead]:
+    result = await session.exec(
+        select(Task, SampleSet.name, Subset.name)
+        .outerjoin(SampleSet, Task.sample_set_id == SampleSet.id)
+        .outerjoin(Subset, Task.input_subset_id == Subset.id)
+        .order_by(Task.created_at.desc())
+    )
+    return [_task_to_read(task, ss_name, sub_name) for task, ss_name, sub_name in result.all()]
 
 
 async def cancel_task(session: AsyncSession, task: Task) -> Task:
@@ -184,3 +219,26 @@ async def submit_batch_tasks(
             )
 
     return tasks, errors
+
+
+async def delete_task(session: AsyncSession, task: Task) -> None:
+    """Hard-delete a finished task record. Only completed/failed/cancelled tasks can be deleted."""
+    if task.status not in _FINISHED_STATUSES:
+        raise TaskNotCancellable()
+    await session.delete(task)
+    await session.commit()
+
+
+async def clear_finished_tasks(session: AsyncSession, user_id: uuid.UUID) -> int:
+    """Delete all finished (completed/failed/cancelled) tasks for a user. Returns count deleted."""
+    result = await session.exec(
+        select(Task).where(
+            Task.user_id == user_id,
+            Task.status.in_(_FINISHED_STATUSES),  # type: ignore[attr-defined]
+        )
+    )
+    tasks = list(result.all())
+    for task in tasks:
+        await session.delete(task)
+    await session.commit()
+    return len(tasks)

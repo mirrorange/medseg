@@ -8,7 +8,14 @@ from app.core.exceptions import PermissionDenied
 from app.db import get_session
 from app.models.user import User, UserRole
 from app.schemas.task import TaskRead
-from app.services.task import cancel_task, get_task, list_all_tasks, list_user_tasks
+from app.services.task import (
+    cancel_task,
+    clear_finished_tasks,
+    delete_task,
+    get_task,
+    list_all_tasks,
+    list_user_tasks,
+)
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -31,6 +38,16 @@ async def list_all(
     return await list_all_tasks(session)
 
 
+@router.delete("/history")
+async def clear_history(
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Delete all finished tasks (completed/failed/cancelled) for current user."""
+    count = await clear_finished_tasks(session, user.id)
+    return {"deleted": count}
+
+
 @router.get("/{task_id}", response_model=TaskRead)
 async def get_task_detail(
     task_id: uuid.UUID,
@@ -44,7 +61,7 @@ async def get_task_detail(
     return task
 
 
-@router.delete("/{task_id}", response_model=TaskRead)
+@router.post("/{task_id}/cancel", response_model=TaskRead)
 async def cancel_task_endpoint(
     task_id: uuid.UUID,
     user: User = Depends(get_current_user),
@@ -55,3 +72,16 @@ async def cancel_task_endpoint(
     if task.user_id != user.id and user.role != UserRole.admin:
         raise PermissionDenied()
     return await cancel_task(session, task)
+
+
+@router.delete("/{task_id}", status_code=204)
+async def delete_task_endpoint(
+    task_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Delete a finished task record (completed/failed/cancelled only)."""
+    task = await get_task(session, task_id)
+    if task.user_id != user.id and user.role != UserRole.admin:
+        raise PermissionDenied()
+    await delete_task(session, task)

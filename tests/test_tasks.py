@@ -286,9 +286,67 @@ async def test_cancel_task(client, auth_header, sample_set_with_subset):
     )
     task_id = resp.json()["id"]
 
-    resp = await client.delete(f"/api/tasks/{task_id}", headers=auth_header)
+    resp = await client.post(f"/api/tasks/{task_id}/cancel", headers=auth_header)
     assert resp.status_code == 200
     assert resp.json()["status"] == "cancelled"
+
+
+@pytest.mark.asyncio
+async def test_delete_finished_task(client, auth_header, sample_set_with_subset):
+    """Test deleting a cancelled task record."""
+    data = sample_set_with_subset
+    # Submit and cancel a task
+    resp = await client.post(
+        "/api/pipelines/run",
+        json={
+            "module_name": "echo",
+            "sample_set_id": data["sample_set_id"],
+            "input_subset_id": data["subset_id"],
+            "output_subset_name": "echo_delete",
+        },
+        headers=auth_header,
+    )
+    task_id = resp.json()["id"]
+    await client.post(f"/api/tasks/{task_id}/cancel", headers=auth_header)
+
+    # Delete the record
+    resp = await client.delete(f"/api/tasks/{task_id}", headers=auth_header)
+    assert resp.status_code == 204
+
+    # Verify it's gone
+    resp = await client.get(f"/api/tasks/{task_id}", headers=auth_header)
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_clear_task_history(client, auth_header, sample_set_with_subset):
+    """Test clearing all finished tasks."""
+    data = sample_set_with_subset
+    # Submit and cancel two tasks
+    for name in ["echo_clear1", "echo_clear2"]:
+        resp = await client.post(
+            "/api/pipelines/run",
+            json={
+                "module_name": "echo",
+                "sample_set_id": data["sample_set_id"],
+                "input_subset_id": data["subset_id"],
+                "output_subset_name": name,
+            },
+            headers=auth_header,
+        )
+        task_id = resp.json()["id"]
+        await client.post(f"/api/tasks/{task_id}/cancel", headers=auth_header)
+
+    # Clear history
+    resp = await client.delete("/api/tasks/history", headers=auth_header)
+    assert resp.status_code == 200
+    assert resp.json()["deleted"] >= 2
+
+    # Verify tasks are gone
+    resp = await client.get("/api/tasks", headers=auth_header)
+    tasks = resp.json()
+    cancelled = [t for t in tasks if t["status"] == "cancelled"]
+    assert len(cancelled) == 0
 
 
 @pytest.mark.asyncio
