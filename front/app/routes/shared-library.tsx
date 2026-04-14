@@ -113,8 +113,8 @@ export default function SharedLibraryPage({ loaderData }: Route.ComponentProps) 
                 <TableCell className="font-medium">
                   {item.sample_set_name}
                 </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {item.sample_set_description ?? "—"}
+                <TableCell className="text-muted-foreground max-w-[300px]">
+                  <span className="line-clamp-2">{item.sample_set_description ?? "—"}</span>
                 </TableCell>
                 <TableCell className="text-muted-foreground">
                   {item.shared_by_username}

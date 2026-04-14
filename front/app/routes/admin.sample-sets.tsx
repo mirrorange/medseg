@@ -241,7 +241,7 @@ export default function AdminSampleSetsPage({
                     <div>
                       <div className="font-medium">{set.name}</div>
                       {set.description && (
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-xs text-muted-foreground line-clamp-2">
                           {set.description}
                         </div>
                       )}

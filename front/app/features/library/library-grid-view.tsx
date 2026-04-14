@@ -109,7 +109,7 @@ export function LibraryGridView({
               </span>
             )}
             {item.type === "sample_set" && item.description && (
-              <span className="text-muted-foreground w-full truncate text-center text-xs">
+              <span className="text-muted-foreground w-full text-center text-xs line-clamp-2">
                 {item.description}
               </span>
             )}

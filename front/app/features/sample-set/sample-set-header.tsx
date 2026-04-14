@@ -38,7 +38,7 @@ export function SampleSetHeader({
   // Inline edit: description
   const [editingDesc, setEditingDesc] = useState(false);
   const [descValue, setDescValue] = useState(sampleSet.description ?? "");
-  const descInputRef = useRef<HTMLInputElement>(null);
+  const descInputRef = useRef<HTMLTextAreaElement>(null);
 
   // Sharing state
   const [shareLoading, setShareLoading] = useState(false);
@@ -157,15 +157,19 @@ export function SampleSetHeader({
 
         {/* Description */}
         {editingDesc ? (
-          <div className="flex items-center gap-1">
-            <input
+          <div className="flex items-start gap-1">
+            <textarea
               ref={descInputRef}
-              className="bg-transparent text-sm text-muted-foreground outline-none border-b border-primary"
+              className="min-h-[2.5rem] w-full resize-none bg-transparent text-sm text-muted-foreground outline-none border-b border-primary"
               value={descValue}
+              rows={3}
               placeholder="Add a description…"
               onChange={(e) => setDescValue(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") void saveDesc();
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void saveDesc();
+                }
                 if (e.key === "Escape") {
                   setDescValue(sampleSet.description ?? "");
                   setEditingDesc(false);
@@ -176,7 +180,7 @@ export function SampleSetHeader({
           </div>
         ) : (
           <button
-            className="w-fit text-left text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="w-fit max-w-full text-left text-sm text-muted-foreground whitespace-pre-line hover:text-foreground transition-colors"
             onClick={() => setEditingDesc(true)}
             title="Click to edit description"
           >
