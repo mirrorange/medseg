@@ -1,3 +1,4 @@
+import { useSearchParams } from "react-router";
 import type { Route } from "./+types/library";
 import { LibraryBrowser } from "~/features/library/library-browser";
 
@@ -6,9 +7,12 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export default function LibraryPage() {
+  const [searchParams] = useSearchParams();
+  const initialFolder = searchParams.get("folder") ?? null;
+
   return (
     <div className="flex h-full flex-col">
-      <LibraryBrowser />
+      <LibraryBrowser initialFolderId={initialFolder} />
     </div>
   );
 }

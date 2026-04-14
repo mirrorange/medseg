@@ -28,7 +28,11 @@ interface ContextMenuState {
   item: LibraryItem | null;
 }
 
-export function LibraryBrowser() {
+interface LibraryBrowserProps {
+  initialFolderId?: string | null;
+}
+
+export function LibraryBrowser({ initialFolderId }: LibraryBrowserProps) {
   const navigate = useNavigate();
   const {
     folderId,
@@ -85,11 +89,28 @@ export function LibraryBrowser() {
     enabled: !isLoading,
   });
 
-  // Load contents on mount
+  // Load contents on mount (use initial folder from URL if present)
   useEffect(() => {
-    void navigateTo(null);
+    void navigateTo(initialFolderId ?? null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Sync folderId to URL search params
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const current = url.searchParams.get("folder");
+    if (folderId) {
+      if (current !== folderId) {
+        url.searchParams.set("folder", folderId);
+        window.history.replaceState(null, "", url.toString());
+      }
+    } else {
+      if (current) {
+        url.searchParams.delete("folder");
+        window.history.replaceState(null, "", url.toString());
+      }
+    }
+  }, [folderId]);
 
   // Keyboard shortcuts
   useEffect(() => {
