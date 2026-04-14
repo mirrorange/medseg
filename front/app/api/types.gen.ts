@@ -595,6 +595,10 @@ export type SampleSetDetail = {
      * Is Shared
      */
     is_shared?: boolean;
+    /**
+     * Folder Name
+     */
+    folder_name?: string | null;
 };
 
 /**

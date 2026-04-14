@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { Share2, Sparkles, Check, X, LinkIcon } from "lucide-react";
+import { Link } from "react-router";
+import { Share2, Sparkles, Check, X, LinkIcon, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
 import {
@@ -124,7 +125,33 @@ export function SampleSetHeader({
   }, [awareness, onPrimaryAction]);
 
   return (
-    <div className="flex items-start justify-between gap-4 px-4 py-3">
+    <div className="flex flex-col gap-1 px-4 py-3">
+      {/* Breadcrumb navigation */}
+      <nav className="flex items-center gap-1 text-sm text-muted-foreground">
+        <Link
+          to="/app/library"
+          className="hover:text-foreground transition-colors"
+        >
+          Library
+        </Link>
+        {sampleSet.folder_id && sampleSet.folder_name && (
+          <>
+            <ChevronRight className="size-3.5 shrink-0" />
+            <Link
+              to={`/app/library?folder=${sampleSet.folder_id}`}
+              className="hover:text-foreground transition-colors truncate max-w-[200px]"
+            >
+              {sampleSet.folder_name}
+            </Link>
+          </>
+        )}
+        <ChevronRight className="size-3.5 shrink-0" />
+        <span className="text-foreground truncate max-w-[300px]">
+          {sampleSet.name}
+        </span>
+      </nav>
+
+      <div className="flex items-start justify-between gap-4">
       {/* Left: name + description */}
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         {/* Name */}
@@ -231,6 +258,7 @@ export function SampleSetHeader({
             {isShared ? "Click to unshare" : "Share this sample set"}
           </TooltipContent>
         </Tooltip>
+      </div>
       </div>
     </div>
   );

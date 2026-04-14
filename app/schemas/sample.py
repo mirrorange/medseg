@@ -36,6 +36,7 @@ class AdminSampleSetRead(SampleSetRead):
 class SampleSetDetail(SampleSetRead):
     subsets: list["SubsetRead"] = []
     is_shared: bool = False
+    folder_name: str | None = None
 
 
 # --- Subset ---

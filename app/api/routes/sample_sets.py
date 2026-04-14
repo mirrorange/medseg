@@ -7,6 +7,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.api.dependencies import get_current_user
 from app.core.exceptions import PermissionDenied
 from app.db import get_session
+from app.models.folder import Folder
 from app.models.share import Share
 from app.models.user import User, UserRole
 from app.schemas.sample import (
@@ -68,6 +69,14 @@ async def get_detail(
     )
     is_shared = result.first() is not None
 
+    # Get folder name if in a folder
+    folder_name: str | None = None
+    if ss.folder_id:
+        folder_result = await session.exec(
+            select(Folder.name).where(Folder.id == ss.folder_id)
+        )
+        folder_name = folder_result.first()
+
     return SampleSetDetail(
         id=ss.id,
         name=ss.name,
@@ -78,6 +87,7 @@ async def get_detail(
         updated_at=ss.updated_at,
         subsets=[SubsetRead.model_validate(s, from_attributes=True) for s in subsets],
         is_shared=is_shared,
+        folder_name=folder_name,
     )
 
 
