@@ -130,6 +130,43 @@ async def test_non_admin_cannot_access_stats(client, regular_header):
     assert resp.status_code == 403
 
 
+@pytest.mark.asyncio
+async def test_shared_count_decreases_when_sample_set_deleted(
+    client, admin_header, regular_header
+):
+    """Deleting a shared sample set should also remove the Share record,
+    so the admin stats shared_count stays accurate."""
+    # Regular user creates and shares a sample set
+    resp = await client.post(
+        "/api/sample-sets",
+        json={"name": "WillBeDeleted"},
+        headers=regular_header,
+    )
+    ss_id = resp.json()["id"]
+
+    await client.post(
+        f"/api/library/shared/{ss_id}",
+        headers=regular_header,
+    )
+
+    # Verify shared_count increased
+    resp = await client.get("/api/admin/stats", headers=admin_header)
+    shared_before = resp.json()["shared_count"]
+    assert shared_before >= 1
+
+    # Delete the sample set (as admin)
+    resp = await client.delete(
+        f"/api/sample-sets/{ss_id}",
+        headers=admin_header,
+    )
+    assert resp.status_code == 204
+
+    # shared_count should have decreased
+    resp = await client.get("/api/admin/stats", headers=admin_header)
+    shared_after = resp.json()["shared_count"]
+    assert shared_after == shared_before - 1
+
+
 # --------------- Admin Create User ---------------
 
 

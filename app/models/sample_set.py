@@ -6,6 +6,7 @@ from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
     from app.models.folder import Folder
+    from app.models.share import Share
     from app.models.subset import Subset
 
 
@@ -22,6 +23,10 @@ class SampleSet(SQLModel, table=True):
 
     folder: Optional["Folder"] = Relationship(back_populates="sample_sets")
     subsets: list["Subset"] = Relationship(
+        back_populates="sample_set",
+        cascade_delete=True,
+    )
+    shares: list["Share"] = Relationship(
         back_populates="sample_set",
         cascade_delete=True,
     )

@@ -176,11 +176,15 @@ app/
 | --- | --- | --- |
 | id | UUID | 主键 |
 | name | str | 样本集名称 |
-| description | str (nullable) | 描述 |
+| description | str (nullable) | 描述（支持多行文本） |
 | owner_id | UUID FK → User | 所有者 |
 | folder_id | UUID FK → Folder (nullable) | 所属文件夹（null = 根级） |
 | created_at | datetime | 创建时间 |
 | updated_at | datetime | 更新时间 |
+
+**关系**：
+- `subsets`：一对多关联 Subset，`cascade_delete=True`
+- `shares`：一对多关联 Share，`cascade_delete=True`（删除样本集时自动清理共享记录）
 
 #### Subset
 
@@ -379,9 +383,9 @@ async def require_owner(resource_owner_id: UUID, user: User = Depends(get_curren
 | 方法 | 路径 | 说明 | 权限 |
 | --- | --- | --- | --- |
 | POST | `/api/sample-sets` | 创建样本集 | 已认证 |
-| GET | `/api/sample-sets/{id}` | 获取样本集详情（含子集列表 + `is_shared` 字段） | 所有者/管理员 |
+| GET | `/api/sample-sets/{id}` | 获取样本集详情（含子集列表 + `is_shared` + `folder_name` 字段） | 所有者/管理员 |
 | PUT | `/api/sample-sets/{id}` | 更新样本集（名称/描述/位置） | 所有者 |
-| DELETE | `/api/sample-sets/{id}` | 删除样本集（级联删除子集和图像） | 所有者 |
+| DELETE | `/api/sample-sets/{id}` | 删除样本集（级联删除子集、图像及关联的共享记录） | 所有者 |
 | GET | `/api/sample-sets/{id}/awareness` | 获取管线感知建议（三级分层响应） | 所有者/管理员 |
 
 #### 子集 (`/api/sample-sets/{set_id}/subsets`)
