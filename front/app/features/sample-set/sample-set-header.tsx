@@ -10,10 +10,12 @@ import {
 } from "~/components/ui/tooltip";
 import {
   updateApiSampleSetsSampleSetIdPut,
+  pathApiLibraryPathFolderIdGet,
   publishSharedApiLibrarySharedSampleSetIdPost,
   unpublishSharedApiLibrarySharedSampleSetIdDelete,
 } from "~/api";
 import type { SampleSetDetail, AwarenessResponse, ModuleAwarenessItem } from "~/api/types.gen";
+import { buildLibraryUrlFromBreadcrumb } from "~/features/library/library-path";
 
 interface SampleSetHeaderProps {
   sampleSet: SampleSetDetail;
@@ -43,12 +45,38 @@ export function SampleSetHeader({
 
   // Sharing state
   const [shareLoading, setShareLoading] = useState(false);
+  const [folderLink, setFolderLink] = useState("/app/library");
 
   // Sync values if sampleSet changes externally
   useEffect(() => {
     setNameValue(sampleSet.name);
     setDescValue(sampleSet.description ?? "");
   }, [sampleSet.name, sampleSet.description]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadFolderLink() {
+      if (!sampleSet.folder_id) {
+        setFolderLink("/app/library");
+        return;
+      }
+
+      const { data } = await pathApiLibraryPathFolderIdGet({
+        path: { folder_id: sampleSet.folder_id },
+      });
+
+      if (!cancelled) {
+        setFolderLink(data ? buildLibraryUrlFromBreadcrumb(data) : "/app/library");
+      }
+    }
+
+    void loadFolderLink();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sampleSet.folder_id]);
 
   // Focus input on edit start
   useEffect(() => {
@@ -138,7 +166,7 @@ export function SampleSetHeader({
           <>
             <ChevronRight className="size-3.5 shrink-0" />
             <Link
-              to={`/app/library?folder=${sampleSet.folder_id}`}
+              to={folderLink}
               className="hover:text-foreground transition-colors truncate max-w-[200px]"
             >
               {sampleSet.folder_name}

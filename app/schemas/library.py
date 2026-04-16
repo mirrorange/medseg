@@ -67,6 +67,11 @@ class LibraryContents(BaseModel):
     items: list[LibraryItem]
 
 
+class LibraryPathResolution(BaseModel):
+    folder_id: uuid.UUID | None
+    breadcrumb: list[BreadcrumbItem]
+
+
 # --- Batch move ---
 
 

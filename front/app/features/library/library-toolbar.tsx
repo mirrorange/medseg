@@ -18,6 +18,7 @@ import {
 import { Separator } from "~/components/ui/separator";
 import { LibraryAddressBar } from "./library-breadcrumb";
 import { useLibraryStore } from "~/stores/library";
+import { useLibraryRouteNavigation } from "./use-library-route-navigation";
 
 interface LibraryToolbarProps {
   onCreateFolder: () => void;
@@ -28,21 +29,16 @@ export function LibraryToolbar({
   onCreateFolder,
   onCreateSampleSet,
 }: LibraryToolbarProps) {
+  const { canGoBack, canGoForward, goBack, goForward, goUp } =
+    useLibraryRouteNavigation();
   const {
-    history,
-    historyIndex,
     breadcrumb,
     isLoading,
     viewMode,
     setViewMode,
-    goBack,
-    goForward,
-    goUp,
     refresh,
   } = useLibraryStore();
 
-  const canGoBack = historyIndex > 0;
-  const canGoForward = historyIndex < history.length - 1;
   const canGoUp = breadcrumb.length > 0;
 
   return (

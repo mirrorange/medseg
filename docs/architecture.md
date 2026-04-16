@@ -365,6 +365,7 @@ async def require_owner(resource_owner_id: UUID, user: User = Depends(get_curren
 | 方法 | 路径 | 说明 | 权限 |
 | --- | --- | --- | --- |
 | GET | `/api/library/contents` | 获取指定目录下的内容（扁平列表） | 已认证 |
+| GET | `/api/library/resolve` | 根据路径片段解析目标文件夹（供前端路径路由加载） | 已认证 |
 | GET | `/api/library/tree` | 获取完整目录树（用于移动对话框等） | 已认证 |
 | GET | `/api/library/path/{folder_id}` | 获取文件夹面包屑路径（祖先链） | 已认证 |
 | POST | `/api/library/folders` | 创建文件夹（强制同目录名称唯一） | 已认证 |
@@ -383,7 +384,7 @@ async def require_owner(resource_owner_id: UUID, user: User = Depends(get_curren
 | 方法 | 路径 | 说明 | 权限 |
 | --- | --- | --- | --- |
 | POST | `/api/sample-sets` | 创建样本集 | 已认证 |
-| GET | `/api/sample-sets/{id}` | 获取样本集详情（含子集列表 + `is_shared` + `folder_name` 字段） | 所有者/管理员 |
+| GET | `/api/sample-sets/{id}` | 获取样本集详情（含子集列表 + `is_shared` + `folder_name` 字段；前端再通过 library path 接口构造目录链接） | 所有者/管理员 |
 | PUT | `/api/sample-sets/{id}` | 更新样本集（名称/描述/位置） | 所有者 |
 | DELETE | `/api/sample-sets/{id}` | 删除样本集（级联删除子集、图像及关联的共享记录） | 所有者 |
 | GET | `/api/sample-sets/{id}/awareness` | 获取管线感知建议（三级分层响应） | 所有者/管理员 |
@@ -877,7 +878,6 @@ class ConnectionManager:
 {
   "folder_id": "uuid | null",
   "breadcrumb": [
-    { "id": null, "name": "Library" },
     { "id": "uuid-1", "name": "CT Scans" }
   ],
   "items": [
@@ -901,7 +901,33 @@ class ConnectionManager:
 }
 ```
 
+`breadcrumb` 仅返回实际文件夹祖先链，不包含根节点 `"Library"`；根节点由前端统一补上并渲染为 `/app/library`。
+
 **排序规则**：文件夹始终排在样本集前面（类似文件管理器中目录排在文件前面），同类型内按指定字段排序。
+
+#### `GET /api/library/resolve` — 按路径解析文件夹
+
+根据路径片段解析用户样本库中的目标文件夹，用于前端将 `/app/library/folder-a/subfolder-b` 这样的地址转换为内部 `folder_id`。
+
+**查询参数**：
+
+| 参数 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `path` | `list[str]` | `[]` | 目录路径片段，按顺序重复传递，如 `?path=folder-a&path=subfolder-b` |
+
+**响应**：
+
+```json
+{
+  "folder_id": "uuid | null",
+  "breadcrumb": [
+    { "id": "uuid-1", "name": "folder-a" },
+    { "id": "uuid-2", "name": "subfolder-b" }
+  ]
+}
+```
+
+当 `path` 为空时返回根目录：`{ "folder_id": null, "breadcrumb": [] }`。任一路径片段不存在时返回 `404`.
 
 #### `GET /api/library/path/{folder_id}` — 获取面包屑路径
 
@@ -911,11 +937,12 @@ class ConnectionManager:
 
 ```json
 [
-  { "id": null, "name": "Library" },
   { "id": "uuid-parent", "name": "Research" },
   { "id": "uuid-current", "name": "CT Scans" }
 ]
 ```
+
+与 `contents` 接口一致，响应不包含根节点 `"Library"`；前端负责在地址栏/面包屑中追加根段。
 
 #### `POST /api/library/batch-move` — 批量移动
 
@@ -967,6 +994,10 @@ class LibraryContents(BaseModel):
     breadcrumb: list[BreadcrumbItem]
     items: list[LibraryItem]
 
+class LibraryPathResolution(BaseModel):
+    folder_id: uuid.UUID | None
+    breadcrumb: list[BreadcrumbItem]
+
 class BatchMoveRequest(BaseModel):
     items: list[BatchMoveItem]
     target_folder_id: uuid.UUID | None = None
@@ -984,6 +1015,7 @@ class BatchMoveItem(BaseModel):
 | --- | --- |
 | `get_library_contents()` | 查询指定目录下的文件夹和样本集，构建 `LibraryContents` 响应 |
 | `get_folder_breadcrumb()` | 从指定文件夹向上遍历至根，返回面包屑路径 |
+| `resolve_library_path()` | 根据路径片段逐层解析文件夹，返回目标 `folder_id` 与面包屑 |
 | `batch_move_items()` | 批量移动操作，含循环引用检测和名称唯一性校验 |
 | `check_name_unique()` | 检查目标目录下名称是否唯一（跨文件夹和样本集） |
 | `create_folder()` | **修改**：增加名称唯一性校验 |

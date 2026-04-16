@@ -2,6 +2,11 @@ import { useState, useRef, useEffect } from "react";
 import { useLibraryStore } from "~/stores/library";
 import { Input } from "~/components/ui/input";
 import { cn } from "~/lib/utils";
+import {
+  formatLibraryDisplayPath,
+  normalizeLibraryInput,
+} from "./library-path";
+import { useLibraryRouteNavigation } from "./use-library-route-navigation";
 
 /**
  * Dual-mode address bar (inspired by XDeck / Windows Explorer):
@@ -9,16 +14,13 @@ import { cn } from "~/lib/utils";
  * - Edit mode: text input showing the path, Enter to navigate / Escape to cancel
  */
 export function LibraryAddressBar() {
-  const { breadcrumb, items, navigateTo, isLoading } = useLibraryStore();
+  const { breadcrumb, isLoading } = useLibraryStore();
+  const { goRoot, goToBreadcrumb, goToSegments } = useLibraryRouteNavigation();
   const [editing, setEditing] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Build display path from breadcrumb (with "/" separator, no spaces)
-  const pathText =
-    breadcrumb.length === 0
-      ? "Library"
-      : "Library/" + breadcrumb.map((c) => c.name).join("/");
+  const pathText = formatLibraryDisplayPath(breadcrumb.map((crumb) => crumb.name));
 
   const enterEdit = () => {
     setInputValue(pathText);
@@ -30,34 +32,9 @@ export function LibraryAddressBar() {
     const trimmed = inputValue.trim();
     if (!trimmed || trimmed === pathText) return;
 
-    // Parse the typed path and try to navigate
-    // Strip leading "Library/" or "Library" prefix
-    let relative = trimmed;
-    if (relative.toLowerCase().startsWith("library/")) {
-      relative = relative.slice("library/".length);
-    } else if (relative.toLowerCase() === "library") {
-      void navigateTo(null);
-      return;
-    }
-
-    // Split into segments and try to resolve by matching folder names
-    // Start from the current breadcrumb and look for direct child matches
-    const segments = relative.split("/").filter(Boolean);
-    if (segments.length === 0) {
-      void navigateTo(null);
-      return;
-    }
-
-    // Try to find a matching folder among current items for the first segment
-    // This is a best-effort approach since we can't do path-based resolution
-    const firstSegment = segments[0].toLowerCase();
-    const matchingFolder = items.find(
-      (i) => i.type === "folder" && i.name.toLowerCase() === firstSegment,
-    );
-    if (matchingFolder) {
-      void navigateTo(matchingFolder.id);
-    }
-    // If no match found, just stay where we are
+    const segments = normalizeLibraryInput(trimmed);
+    if (segments === null) return;
+    goToSegments(segments);
   };
 
   const handleCancel = () => {
@@ -108,7 +85,7 @@ export function LibraryAddressBar() {
         className="text-muted-foreground hover:text-foreground shrink-0 px-1 transition-colors"
         onClick={(e) => {
           e.stopPropagation();
-          void navigateTo(null);
+          goRoot();
         }}
       >
         Library
@@ -127,7 +104,7 @@ export function LibraryAddressBar() {
               )}
               onClick={(e) => {
                 e.stopPropagation();
-                if (!isLast) void navigateTo(crumb.id);
+                if (!isLast) goToBreadcrumb(i);
               }}
             >
               {crumb.name}

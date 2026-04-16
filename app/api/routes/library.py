@@ -15,6 +15,7 @@ from app.schemas.library import (
     FolderRead,
     FolderUpdate,
     LibraryContents,
+    LibraryPathResolution,
     LibraryTree,
     SharedSampleSetRead,
 )
@@ -29,6 +30,7 @@ from app.services.library import (
     get_library_contents,
     get_library_tree,
     list_shared_sample_sets,
+    resolve_library_path,
     share_sample_set,
     unshare_sample_set,
     update_folder,
@@ -55,6 +57,15 @@ async def contents(
 
 
 # --------------- Breadcrumb ---------------
+
+
+@router.get("/resolve", response_model=LibraryPathResolution)
+async def resolve(
+    path: list[str] = Query(default_factory=list),
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    return await resolve_library_path(session, user.id, path)
 
 
 @router.get("/path/{folder_id}", response_model=list[BreadcrumbItem])

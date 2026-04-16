@@ -286,7 +286,9 @@ async def test_shared_search(client: AsyncClient, auth_headers):
     assert data[0]["sample_set_name"] == "Brain MRI Study"
 
     # Search by description
-    resp = await client.get("/api/library/shared?search=radiology", headers=auth_headers)
+    resp = await client.get(
+        "/api/library/shared?search=radiology", headers=auth_headers
+    )
     data = resp.json()
     assert len(data) == 1
     assert data[0]["sample_set_name"] == "Lung CT Study"
@@ -436,6 +438,54 @@ async def test_breadcrumb_nonexistent_folder(client: AsyncClient, auth_headers):
     fake_id = str(uuid.uuid4())
     resp = await client.get(
         f"/api/library/path/{fake_id}", headers=auth_headers,
+    )
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_resolve_library_path(client: AsyncClient, auth_headers):
+    resp = await client.post(
+        "/api/library/folders", headers=auth_headers, json={"name": "Top"},
+    )
+    top_id = resp.json()["id"]
+
+    resp = await client.post(
+        "/api/library/folders",
+        headers=auth_headers,
+        json={"name": "Nested", "parent_id": top_id},
+    )
+    nested_id = resp.json()["id"]
+
+    resp = await client.get(
+        "/api/library/resolve",
+        headers=auth_headers,
+        params=[("path", "Top"), ("path", "Nested")],
+    )
+    assert resp.status_code == 200
+
+    data = resp.json()
+    assert data["folder_id"] == nested_id
+    assert [crumb["name"] for crumb in data["breadcrumb"]] == ["Top", "Nested"]
+
+
+@pytest.mark.asyncio
+async def test_resolve_library_root_path(client: AsyncClient, auth_headers):
+    resp = await client.get("/api/library/resolve", headers=auth_headers)
+    assert resp.status_code == 200
+
+    data = resp.json()
+    assert data["folder_id"] is None
+    assert data["breadcrumb"] == []
+
+
+@pytest.mark.asyncio
+async def test_resolve_library_path_nonexistent_folder(
+    client: AsyncClient, auth_headers
+):
+    resp = await client.get(
+        "/api/library/resolve",
+        headers=auth_headers,
+        params=[("path", "Missing")],
     )
     assert resp.status_code == 404
 
@@ -614,7 +664,10 @@ async def test_same_name_different_folders_ok(client: AsyncClient, auth_headers)
 
 @pytest.mark.asyncio
 async def test_batch_move_duplicate_name_fails(client: AsyncClient, auth_headers):
-    """Moving an item to a folder that already has an item with the same name should fail."""
+    """
+    Moving an item to a folder that already has an item with the same name
+    should fail.
+    """
     resp = await client.post(
         "/api/library/folders", headers=auth_headers, json={"name": "Dest2"},
     )

@@ -15,7 +15,10 @@ import {
 import { CreateFolderDialog } from "./create-folder-dialog";
 import { CreateSampleSetDialog } from "./create-sample-set-dialog";
 import { RenameFolderDialog } from "./rename-folder-dialog";
-import { MoveDialog } from "./move-dialog";import { useLassoSelection, LassoOverlay } from "./use-lasso-selection";import {
+import { MoveDialog } from "./move-dialog";
+import { useLassoSelection, LassoOverlay } from "./use-lasso-selection";
+import { useLibraryRouteNavigation } from "./use-library-route-navigation";
+import {
   deleteApiLibraryFoldersFolderIdDelete,
   deleteApiSampleSetsSampleSetIdDelete,
   updateApiSampleSetsSampleSetIdPut,
@@ -34,6 +37,8 @@ interface LibraryBrowserProps {
 
 export function LibraryBrowser({ initialFolderId }: LibraryBrowserProps) {
   const navigate = useNavigate();
+  const lastLoadedFolderRef = useRef<string | null | undefined>(undefined);
+  const { goToChild, goUp } = useLibraryRouteNavigation();
   const {
     folderId,
     items,
@@ -89,28 +94,13 @@ export function LibraryBrowser({ initialFolderId }: LibraryBrowserProps) {
     enabled: !isLoading,
   });
 
-  // Load contents on mount (use initial folder from URL if present)
+  // Load contents from the path-driven route state.
   useEffect(() => {
-    void navigateTo(initialFolderId ?? null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Sync folderId to URL search params
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    const current = url.searchParams.get("folder");
-    if (folderId) {
-      if (current !== folderId) {
-        url.searchParams.set("folder", folderId);
-        window.history.replaceState(null, "", url.toString());
-      }
-    } else {
-      if (current) {
-        url.searchParams.delete("folder");
-        window.history.replaceState(null, "", url.toString());
-      }
-    }
-  }, [folderId]);
+    const targetFolderId = initialFolderId ?? null;
+    if (lastLoadedFolderRef.current === targetFolderId) return;
+    lastLoadedFolderRef.current = targetFolderId;
+    void navigateTo(targetFolderId);
+  }, [initialFolderId, navigateTo]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -128,23 +118,23 @@ export function LibraryBrowser({ initialFolderId }: LibraryBrowserProps) {
       }
       if (e.key === "Backspace" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        useLibraryStore.getState().goUp();
+        goUp();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectAll, clearSelection]);
+  }, [clearSelection, goUp, selectAll]);
 
   // Handle opening an item
   const handleOpen = useCallback(
     (item: LibraryItem) => {
       if (item.type === "folder") {
-        void navigateTo(item.id);
+        goToChild(item.name);
       } else {
         navigate(`/app/sample-sets/${item.id}`);
       }
     },
-    [navigateTo, navigate],
+    [goToChild, navigate],
   );
 
   // Handle context menu on items

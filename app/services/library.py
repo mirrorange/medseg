@@ -15,6 +15,7 @@ from app.schemas.library import (
     FolderTreeNode,
     LibraryContents,
     LibraryItem,
+    LibraryPathResolution,
     LibraryTree,
     SharedSampleSetRead,
     TreeSampleSet,
@@ -256,7 +257,9 @@ async def get_library_contents(
             select(func.count()).select_from(Folder).where(Folder.parent_id == f.id)
         )
         sub_ss = await session.exec(
-            select(func.count()).select_from(SampleSet).where(SampleSet.folder_id == f.id)
+            select(func.count())
+            .select_from(SampleSet)
+            .where(SampleSet.folder_id == f.id)
         )
         folder_child_counts[f.id] = (sub_folders.one() or 0) + (sub_ss.one() or 0)
 
@@ -346,6 +349,43 @@ async def get_folder_breadcrumb(
 
     ancestors.reverse()
     return ancestors
+
+
+async def resolve_library_path(
+    session: AsyncSession,
+    owner_id: uuid.UUID,
+    path_segments: list[str],
+) -> LibraryPathResolution:
+    if not path_segments:
+        return LibraryPathResolution(folder_id=None, breadcrumb=[])
+
+    breadcrumb: list[BreadcrumbItem] = []
+    current_parent_id: uuid.UUID | None = None
+    current_folder_id: uuid.UUID | None = None
+
+    for segment in path_segments:
+        query = select(Folder).where(
+            Folder.owner_id == owner_id,
+            Folder.name == segment,
+        )
+        if current_parent_id is None:
+            query = query.where(col(Folder.parent_id).is_(None))
+        else:
+            query = query.where(Folder.parent_id == current_parent_id)
+
+        result = await session.exec(query)
+        folder = result.first()
+        if folder is None:
+            raise FolderNotFound()
+
+        current_folder_id = folder.id
+        current_parent_id = folder.id
+        breadcrumb.append(BreadcrumbItem(id=folder.id, name=folder.name))
+
+    return LibraryPathResolution(
+        folder_id=current_folder_id,
+        breadcrumb=breadcrumb,
+    )
 
 
 # --------------- Batch move ---------------
@@ -589,7 +629,10 @@ async def _check_name_unique(
     exclude_folder_id: uuid.UUID | None = None,
     exclude_sample_set_id: uuid.UUID | None = None,
 ) -> None:
-    """Check that no folder or sample set with the given name exists in the target directory."""
+    """
+    Check that no folder or sample set with the given name exists in the
+    target directory.
+    """
     # Check folders
     folder_query = select(Folder).where(
         Folder.owner_id == owner_id,

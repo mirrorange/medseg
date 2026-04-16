@@ -1,8 +1,7 @@
 import { create } from "zustand";
 import {
-  contentsApiLibraryContentsGet,
-  pathApiLibraryPathFolderIdGet,
   batchMoveApiLibraryBatchMovePost,
+  contentsApiLibraryContentsGet,
 } from "~/api";
 import type { BreadcrumbItem, LibraryItem } from "~/api/types.gen";
 
@@ -20,10 +19,6 @@ interface LibraryState {
   isLoading: boolean;
   error: string | null;
 
-  // Navigation history
-  history: (string | null)[];
-  historyIndex: number;
-
   // Selection
   selectedIds: string[];
 
@@ -34,9 +29,6 @@ interface LibraryState {
 
   // Actions — Navigation
   navigateTo: (folderId: string | null) => Promise<void>;
-  goBack: () => void;
-  goForward: () => void;
-  goUp: () => void;
   refresh: () => Promise<void>;
 
   // Actions — Selection
@@ -67,9 +59,6 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   isLoading: false,
   error: null,
 
-  history: [null],
-  historyIndex: 0,
-
   selectedIds: [],
 
   viewMode: "list",
@@ -82,7 +71,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
-      const { sortField, sortDirection, history, historyIndex } = get();
+      const { sortField, sortDirection } = get();
       const { data } = await contentsApiLibraryContentsGet({
         query: {
           folder_id: folderId ?? undefined,
@@ -93,55 +82,16 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
 
       if (!data) throw new Error("Failed to load contents");
 
-      // Update history — trim forward entries and push new
-      const newHistory = history.slice(0, historyIndex + 1);
-      if (newHistory[newHistory.length - 1] !== folderId) {
-        newHistory.push(folderId);
-      }
-
       set({
         folderId: data.folder_id ?? null,
         breadcrumb: data.breadcrumb,
         items: data.items,
         isLoading: false,
         selectedIds: [],
-        history: newHistory,
-        historyIndex: newHistory.length - 1,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to load contents";
       set({ isLoading: false, error: message });
-    }
-  },
-
-  goBack: () => {
-    const { historyIndex, history } = get();
-    if (historyIndex <= 0) return;
-    const newIndex = historyIndex - 1;
-    const targetId = history[newIndex];
-    // Directly fetch without pushing to history
-    set({ historyIndex: newIndex });
-    void fetchContents(get, set, targetId);
-  },
-
-  goForward: () => {
-    const { historyIndex, history } = get();
-    if (historyIndex >= history.length - 1) return;
-    const newIndex = historyIndex + 1;
-    const targetId = history[newIndex];
-    set({ historyIndex: newIndex });
-    void fetchContents(get, set, targetId);
-  },
-
-  goUp: () => {
-    const { breadcrumb } = get();
-    if (breadcrumb.length <= 1) {
-      // Already at root or one level deep — go to root
-      void get().navigateTo(null);
-    } else {
-      // Go to parent (second-to-last breadcrumb item)
-      const parent = breadcrumb[breadcrumb.length - 2];
-      void get().navigateTo(parent.id);
     }
   },
 
