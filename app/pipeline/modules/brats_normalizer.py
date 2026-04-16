@@ -78,10 +78,6 @@ class BratsNormalizationParams(BaseModel):
         default=None,
         description="Filename or image UUID to use as BraTS T2w.",
     )
-    use_gpu: bool = Field(
-        default=True,
-        description="Allow BrainLes preprocessing backends to use GPU when available.",
-    )
 
 
 @dataclass(frozen=True)
@@ -151,6 +147,7 @@ class BratsNormalizerModule(PipelineModule):
         self._loaded = False
 
     def module_info(self) -> ModuleInfo:
+        max_vram_mb = 4096 if self._gpu_available() else 0
         return ModuleInfo(
             name="brats_normalizer",
             version="0.1.0",
@@ -160,7 +157,7 @@ class BratsNormalizerModule(PipelineModule):
             ),
             suggestion_priority=80,
             max_ram_mb=4096,
-            max_vram_mb=4096,
+            max_vram_mb=max_vram_mb,
             params_schema=BratsNormalizationParams.model_json_schema(),
         )
 
@@ -217,7 +214,6 @@ class BratsNormalizerModule(PipelineModule):
             prepared_inputs,
             run_input.output_dir,
             run_input.work_dir,
-            params.use_gpu,
         )
 
         output_images = []
@@ -296,9 +292,9 @@ class BratsNormalizerModule(PipelineModule):
         prepared_inputs: dict[str, PreparedBratsInput],
         output_dir: Path,
         work_dir: Path,
-        use_gpu: bool,
     ) -> None:
         components = self._load_brainles_components()
+        use_gpu = self._gpu_available()
         normalizer = components["PercentileNormalizer"](
             lower_percentile=0.1,
             upper_percentile=99.9,
@@ -341,6 +337,17 @@ class BratsNormalizerModule(PipelineModule):
             use_gpu=use_gpu,
         )
         preprocessor.run()
+
+    def _gpu_available(self) -> bool:
+        try:
+            import torch
+        except ImportError:
+            return False
+
+        try:
+            return bool(torch.cuda.is_available())
+        except Exception:
+            return False
 
     def _convert_dicom_image(self, source_path: Path, output_path: Path) -> Path:
         sitk = self._load_simpleitk()

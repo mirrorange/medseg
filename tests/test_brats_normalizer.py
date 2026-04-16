@@ -18,11 +18,23 @@ from app.pipeline.modules.brats_normalizer import (
 
 def test_brats_normalizer_module_info():
     mod = BratsNormalizerModule()
+    mod._gpu_available = lambda: True
     info = mod.module_info()
 
     assert info.name == "brats_normalizer"
     assert info.version == "0.1.0"
+    assert info.max_vram_mb == 4096
     assert info.params_schema is not None
+    assert "use_gpu" not in info.params_schema["properties"]
+
+
+def test_brats_normalizer_module_info_sets_vram_to_zero_without_gpu():
+    mod = BratsNormalizerModule()
+    mod._gpu_available = lambda: False
+
+    info = mod.module_info()
+
+    assert info.max_vram_mb == 0
 
 
 @pytest.mark.asyncio
@@ -190,6 +202,7 @@ async def test_brats_normalizer_run_skips_dicom_conversion_for_nifti(
         "_load_brainles_components",
         _fake_brainles_components,
     )
+    monkeypatch.setattr(mod, "_gpu_available", lambda: True)
 
     def _fail_convert(*args, **kwargs):
         raise AssertionError("DICOM conversion should be skipped for NIfTI inputs")
@@ -231,6 +244,7 @@ async def test_brats_normalizer_run_skips_dicom_conversion_for_nifti(
     assert (output_dir / "t2f.nii.gz").exists()
     assert _FakePreprocessor.latest_instance is not None
     assert _FakePreprocessor.latest_instance.atlas_image_path == _FakeAtlas.BRATS_SRI24
+    assert _FakePreprocessor.latest_instance.use_gpu is True
 
 
 @pytest.mark.asyncio
@@ -250,6 +264,7 @@ async def test_brats_normalizer_run_converts_dicom_inputs(tmp_path, monkeypatch)
         "_load_brainles_components",
         _fake_brainles_components,
     )
+    monkeypatch.setattr(mod, "_gpu_available", lambda: False)
 
     converted_paths = []
 
@@ -287,6 +302,8 @@ async def test_brats_normalizer_run_converts_dicom_inputs(tmp_path, monkeypatch)
     assert converted_paths[0][1].name == "t1n.nii.gz"
     assert result.images[0].filename == "t1n.nii.gz"
     assert (output_dir / "t1n.nii.gz").exists()
+    assert _FakePreprocessor.latest_instance is not None
+    assert _FakePreprocessor.latest_instance.use_gpu is False
 
 
 @pytest.mark.asyncio
