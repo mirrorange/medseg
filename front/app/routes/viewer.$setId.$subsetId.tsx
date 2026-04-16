@@ -3,11 +3,13 @@ import { redirect, useNavigate, useSearchParams } from "react-router";
 import { ArrowLeft } from "lucide-react";
 import type { Route } from "./+types/viewer.$setId.$subsetId";
 import { Button } from "~/components/ui/button";
+import { getImageDownloadUrl } from "~/features/viewer/download-url";
 import {
   getDetailApiSampleSetsSampleSetIdSubsetsSubsetIdGet,
+  getMetaApiSampleSetsSampleSetIdSubsetsSubsetIdImagesImageIdGet,
   listAllApiSampleSetsSampleSetIdSubsetsSubsetIdImagesGet,
 } from "~/api";
-import type { ImageRead, SubsetDetail } from "~/api/types.gen";
+import type { ImageRead } from "~/api/types.gen";
 import { useAuthStore } from "~/stores/auth";
 
 // Lazy imports — Cornerstone modules are heavy
@@ -154,17 +156,18 @@ export default function ViewerPage({ loaderData }: Route.ComponentProps) {
 
         if (isSegmentation && sourceSubsetId && image.source_image_id) {
           try {
-            // Load the corresponding source image
-            const sourceImage: ImageRead = {
-              id: image.source_image_id,
-              filename: "",
-              format: image.format,
-              subset_id: sourceSubsetId,
-              storage_path: "",
-              source_image_id: null,
-              metadata_: {},
-              created_at: "",
-            };
+            const { data: sourceImage } =
+              await getMetaApiSampleSetsSampleSetIdSubsetsSubsetIdImagesImageIdGet({
+                path: {
+                  sample_set_id: setId,
+                  subset_id: sourceSubsetId,
+                  image_id: image.source_image_id,
+                },
+              });
+            if (!sourceImage) {
+              throw new Error("Failed to load source image metadata");
+            }
+
             const sourceVid = await loadImageAsVolume(
               sourceImage,
               setId,
@@ -268,21 +271,20 @@ async function loadImageAsVolume(
     "@cornerstonejs/nifti-volume-loader"
   );
 
-  const downloadUrl = `/api/sample-sets/${sampleSetId}/subsets/${subsetId}/images/${image.id}/download`;
+  const downloadUrl = getImageDownloadUrl(
+    sampleSetId,
+    subsetId,
+    image.id,
+    image.filename,
+  );
 
   const format = image.format.toLowerCase();
 
   if (format === "nifti") {
-    // Download the file, create a blob URL, then use the NIfTI loader
-    const response = await fetch(downloadUrl, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!response.ok) throw new Error("Failed to download image");
-    const blob = await response.blob();
-    const blobUrl = URL.createObjectURL(blob);
-
     const imageIds = await createNiftiImageIdsAndCacheMetadata({
-      url: blobUrl,
+      // Keep the original URL so the loader can detect `.nii.gz`
+      // and apply gzip-aware header parsing before reading the volume.
+      url: downloadUrl,
     });
 
     const volumeId = `niftiVolume:${image.id}`;

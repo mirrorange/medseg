@@ -6,6 +6,7 @@ import {
 import { init as dicomImageLoaderInit } from "@cornerstonejs/dicom-image-loader";
 import {
   cornerstoneNiftiImageLoader,
+  init as niftiVolumeLoaderInit,
 } from "@cornerstonejs/nifti-volume-loader";
 import {
   init as cornerstoneToolsInit,
@@ -30,6 +31,20 @@ export async function initCornerstone(): Promise<void> {
 
   await coreInit();
   await dicomImageLoaderInit();
+  niftiVolumeLoaderInit({
+    beforeSend: (_xhr, defaultHeaders) => {
+      const token = useAuthStore.getState().token;
+
+      if (!token) {
+        return defaultHeaders;
+      }
+
+      return {
+        ...defaultHeaders,
+        Authorization: `Bearer ${token}`,
+      };
+    },
+  });
 
   // Register NIfTI image loader
   imageLoader.registerImageLoader("nifti", cornerstoneNiftiImageLoader);
@@ -75,16 +90,4 @@ export async function initCornerstone(): Promise<void> {
   }
 
   initialized = true;
-}
-
-/**
- * Build the download URL for an image, including auth token.
- */
-export function getImageDownloadUrl(
-  sampleSetId: string,
-  subsetId: string,
-  imageId: string
-): string {
-  const token = useAuthStore.getState().token;
-  return `/api/sample-sets/${sampleSetId}/subsets/${subsetId}/images/${imageId}/download?token=${encodeURIComponent(token ?? "")}`;
 }

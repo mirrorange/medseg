@@ -80,10 +80,12 @@ async def get_meta(
 
 
 @router.get("/{image_id}/download")
+@router.get("/{image_id}/download/{download_name:path}")
 async def download(
     sample_set_id: uuid.UUID,
     subset_id: uuid.UUID,
     image_id: uuid.UUID,
+    _download_name: str | None = None,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):

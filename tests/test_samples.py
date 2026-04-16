@@ -186,6 +186,34 @@ async def test_image_upload_and_rename(
 
 
 @pytest.mark.asyncio
+async def test_image_download_accepts_optional_filename_suffix(
+    client: AsyncClient, auth_headers, sample_set_id, subset_id
+):
+    upload_resp = await client.post(
+        f"/api/sample-sets/{sample_set_id}/subsets/{subset_id}/images",
+        headers=auth_headers,
+        files={"file": ("brain.nii.gz", b"fake-nifti-data", "application/octet-stream")},
+    )
+    assert upload_resp.status_code == 201
+    image_id = upload_resp.json()["id"]
+
+    plain_resp = await client.get(
+        f"/api/sample-sets/{sample_set_id}/subsets/{subset_id}/images/{image_id}/download",
+        headers=auth_headers,
+    )
+    assert plain_resp.status_code == 200
+    assert plain_resp.content == b"fake-nifti-data"
+
+    named_resp = await client.get(
+        f"/api/sample-sets/{sample_set_id}/subsets/{subset_id}/images/{image_id}/download/brain.nii.gz",
+        headers=auth_headers,
+    )
+    assert named_resp.status_code == 200
+    assert named_resp.content == b"fake-nifti-data"
+    assert named_resp.headers["content-disposition"] == 'attachment; filename="brain.nii.gz"'
+
+
+@pytest.mark.asyncio
 async def test_image_rename_not_found(
     client: AsyncClient, auth_headers, sample_set_id, subset_id
 ):

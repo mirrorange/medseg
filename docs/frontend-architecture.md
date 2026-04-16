@@ -123,8 +123,9 @@ front/
 │   │   │   ├── mpr-viewer.tsx            # MPR 三视图布局
 │   │   │   ├── segmentation-overlay.tsx  # 分割 mask 叠加控制
 │   │   │   ├── image-navigator.tsx       # 子集内图像切换导航
-│   │   │   ├── toolbar.tsx               # 工具栏（窗宽窗位、缩放、标注工具）
-│   │   │   └── cornerstone-init.ts       # Cornerstone3D 初始化逻辑
+│   │   │   ├── viewer-toolbar.tsx        # 工具栏（窗宽窗位、缩放、标注工具）
+│   │   │   ├── cornerstone-init.ts       # Cornerstone3D 初始化逻辑
+│   │   │   └── download-url.ts           # 图像下载 URL 构造（绝对 URL + 文件名后缀）
 │   │   │
 │   │   ├── tasks/                      # 任务模块
 │   │   │   ├── task-list.tsx           # 任务数据表格（表格视图，含状态徽标、关联名称、操作列）
@@ -595,7 +596,9 @@ Cornerstone3D 需在应用启动时全局初始化一次：
 // app/features/viewer/cornerstone-init.ts
 import { init as coreInit } from "@cornerstonejs/core";
 import { init as dicomImageLoaderInit } from "@cornerstonejs/dicom-image-loader";
+import { init as niftiVolumeLoaderInit } from "@cornerstonejs/nifti-volume-loader";
 import { init as cornerstoneToolsInit } from "@cornerstonejs/tools";
+import { useAuthStore } from "~/stores/auth";
 
 let initialized = false;
 
@@ -603,6 +606,14 @@ export async function initCornerstone(): Promise<void> {
   if (initialized) return;
   await coreInit();
   await dicomImageLoaderInit();
+  niftiVolumeLoaderInit({
+    beforeSend: (_xhr, defaultHeaders) => {
+      const token = useAuthStore.getState().token;
+      return token
+        ? { ...defaultHeaders, Authorization: `Bearer ${token}` }
+        : defaultHeaders;
+    },
+  });
   await cornerstoneToolsInit();
   initialized = true;
 }
@@ -610,33 +621,56 @@ export async function initCornerstone(): Promise<void> {
 
 ### 7.3 图像加载策略
 
-后端提供 `/api/.../images/{id}/download` 端点下载原始图像文件。前端需要：
+后端提供 `/api/.../images/{id}/download` 端点下载原始图像文件，并兼容 `/api/.../images/{id}/download/{filename}`。前端查看器使用后者来保留真实文件名与扩展名。前端需要：
 
-1. **下载图像文件**为 `ArrayBuffer`
+1. **构造绝对下载 URL**：
+   - 使用浏览器 `origin` 将相对路径提升为绝对 URL，满足 `@cornerstonejs/nifti-volume-loader` 内部 `new URL(url)` 的要求
+   - 将 `image.filename` 追加到 `download/` 之后，让 `.nii.gz` 等扩展名在 URL 中可见
 2. **根据格式选择加载器**：
-   - NIfTI：使用 `@cornerstonejs/nifti-volume-loader`，通过自定义 URL scheme `nifti:blob:<blobUrl>` 加载
-   - DICOM：使用 `@cornerstonejs/dicom-image-loader`，通过 `wadouri:<blobUrl>` 加载
-3. **创建体积**并加载到 `RenderingEngine`
+   - NIfTI：直接把绝对下载 URL 传给 `createNiftiImageIdsAndCacheMetadata()`，由 `@cornerstonejs/nifti-volume-loader` 负责 header 读取、gzip 解压和整卷加载
+   - DICOM：前端先 `fetch` 二进制，再通过 `wadouri:<blobUrl>` 方式加载单文件
+3. **认证请求**：
+   - NIfTI loader 自身发起的请求通过 `beforeSend` 注入 `Authorization` 头
+   - DICOM 仍由前端显式 `fetch(..., { headers })`
+4. **创建体积**并加载到 `RenderingEngine`
 
 ```ts
+// app/features/viewer/download-url.ts
+export function getImageDownloadUrl(
+  sampleSetId: string,
+  subsetId: string,
+  imageId: string,
+  filename?: string
+) {
+  const downloadPath =
+    `/api/sample-sets/${sampleSetId}/subsets/${subsetId}/images/${imageId}/download`;
+  const pathWithFilename = filename ? `${downloadPath}/${filename}` : downloadPath;
+  return new URL(pathWithFilename, window.location.origin).toString();
+}
+
 // 加载流程示意
-async function loadNiftiVolume(imageId: string, downloadUrl: string) {
-  const response = await fetch(downloadUrl, {
-    headers: { Authorization: `Bearer ${token}` },
+async function loadNiftiVolume(image: ImageRead, sampleSetId: string, subsetId: string) {
+  const downloadUrl = getImageDownloadUrl(
+    sampleSetId,
+    subsetId,
+    image.id,
+    image.filename
+  );
+
+  const imageIds = await createNiftiImageIdsAndCacheMetadata({
+    url: downloadUrl,
   });
-  const arrayBuffer = await response.arrayBuffer();
 
-  // 注册为 Blob URL 供 Cornerstone 加载
-  const blob = new Blob([arrayBuffer]);
-  const blobUrl = URL.createObjectURL(blob);
-
-  const volumeId = `nifti:${blobUrl}`;
-  const volume = await volumeLoader.createAndCacheVolume(volumeId);
+  const volumeId = `niftiVolume:${image.id}`;
+  const volume = await volumeLoader.createAndCacheVolume(volumeId, { imageIds });
   await volume.load();
 
   return volumeId;
 }
 ```
+
+补充说明：
+不能把 `.nii.gz` 先转成 `blob:` URL 再交给 NIfTI loader。`blob:` URL 会丢失原始文件扩展名，导致加载器无法可靠判断 gzip 压缩格式，从而在只读取 header 的阶段触发解压失败。
 
 ### 7.4 MPR 三视图
 
@@ -688,8 +722,8 @@ function CornerstoneViewport({ viewportId, orientation, volumeId }: Props) {
 
 当子集 `metadata.is_segmentation === true` 时：
 
-1. 从 `metadata.source_subset_id` 加载源子集的全部图像
-2. 从 `metadata.source_image_id_mapping` 确定分割 mask 与原始图像的对应关系
+1. 从 `metadata.source_subset_id` 定位源子集
+2. 基于当前分割图像的 `source_image_id` 读取源图像元数据，获取真实文件名与格式
 3. 将原始图像加载为基础体积
 4. 将分割 mask 加载为 **Derived Labelmap Volume**
 5. 通过 `segmentation.addLabelmapRepresentationToViewportMap()` 叠加到对应视口

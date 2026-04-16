@@ -404,8 +404,12 @@ async def require_owner(resource_owner_id: UUID, user: User = Depends(get_curren
 | POST | `/api/sample-sets/{set_id}/subsets/{subset_id}/images` | 上传图像（multipart） | 所有者 |
 | GET | `/api/.../images/{id}` | 获取图像元数据 | 所有者/管理员 |
 | GET | `/api/.../images/{id}/download` | 下载图像文件 | 所有者/管理员 |
+| GET | `/api/.../images/{id}/download/{filename}` | 下载图像文件（兼容路径，忽略尾部文件名，仅用于保留扩展名信息） | 所有者/管理员 |
 | PUT | `/api/.../images/{id}` | 更新图像信息（重命名） | 所有者 |
 | DELETE | `/api/.../images/{id}` | 删除图像 | 所有者 |
+
+说明：
+下载接口兼容可选的尾部文件名，`/download` 与 `/download/<任意文件名>` 返回同一份二进制内容。该兼容主要用于前端查看器场景，让浏览器侧加载器在 URL 中保留真实扩展名，例如 `.nii.gz`，以便正确推断压缩格式。
 
 #### 管线 (`/api/pipelines`)
 
