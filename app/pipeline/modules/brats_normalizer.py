@@ -68,7 +68,7 @@ class BratsNormalizationParams(BaseModel):
     )
     t1c_image: str | None = Field(
         default=None,
-        description="Filename or image UUID to use as BraTS T1c.",
+        description="Filename or image UUID to use ƒas BraTS T1c.",
     )
     t2f_image: str | None = Field(
         default=None,
@@ -149,7 +149,7 @@ class BratsNormalizerModule(PipelineModule):
     def module_info(self) -> ModuleInfo:
         max_vram_mb = 4096 if self._gpu_available() else 0
         return ModuleInfo(
-            name="brats_normalizer",
+            name="BraTS Normalizer",
             version="0.1.0",
             description=(
                 "BraTS2023 GLI-style MRI normalization via "

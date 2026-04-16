@@ -31,7 +31,7 @@ class EchoModule(PipelineModule):
 
     def module_info(self) -> ModuleInfo:
         return ModuleInfo(
-            name="echo",
+            name="Echo",
             version="0.1.0",
             description="Echo module for testing — copies input to output",
             suggestion_priority=999,
