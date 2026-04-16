@@ -202,6 +202,10 @@ class RunInput(BaseModel):
     images: list[InputImageInfo]   # 输入图像描述
     params: dict         # 用户指定的运行参数
     sample_set_meta: dict          # 样本集上下文
+    input_subset_id: UUID | None = None
+    input_subset_name: str | None = None
+    input_subset_type: str | None = None
+    input_subset_metadata: dict    # 输入子集级元数据
 
 class InputImageInfo(BaseModel):
     id: UUID
@@ -266,6 +270,7 @@ async def run(self, run_input: RunInput) -> RunOutput:
 
 - 只通过 `run_input.input_dir` 和 `run_input.output_dir` 进行文件 I/O
 - `work_dir` 可用于中间文件（如模型推理的临时缓存）
+- `input_subset_metadata` 可用于生成输入子集元数据哈希、记录预处理来源等追踪信息
 - **不要**访问数据库、网络（除非模型需要下载权重）
 - 输出图像的 `source_image_id` 用于建立输入/输出图像映射（分割叠加）
 
