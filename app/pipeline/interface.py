@@ -95,6 +95,10 @@ class RunInput(BaseModel):
     images: list[InputImageInfo]  # Metadata about input images
     params: dict[str, Any] = {}  # User-specified run parameters
     sample_set_meta: dict[str, Any] = {}  # Sample set context
+    input_subset_id: uuid.UUID | None = None
+    input_subset_name: str | None = None
+    input_subset_type: str | None = None
+    input_subset_metadata: dict[str, Any] = {}
 
 
 class RunOutput(BaseModel):

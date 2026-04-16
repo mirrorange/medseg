@@ -330,7 +330,13 @@ async def execute_task(
             session.add(task)
             await session.commit()
 
-        await _notify_task_status(user_id, task_id, "loading", module_name=module_name, sample_set_id=sample_set_id)
+        await _notify_task_status(
+            user_id,
+            task_id,
+            "loading",
+            module_name=module_name,
+            sample_set_id=sample_set_id,
+        )
 
         # --- Load module ---
         mod = registry.get(module_name)
@@ -350,7 +356,13 @@ async def execute_task(
             session.add(task)
             await session.commit()
 
-        await _notify_task_status(user_id, task_id, "running", module_name=module_name, sample_set_id=sample_set_id)
+        await _notify_task_status(
+            user_id,
+            task_id,
+            "running",
+            module_name=module_name,
+            sample_set_id=sample_set_id,
+        )
 
         # --- Stage input files ---
         work_dir = Path(tempfile.mkdtemp(prefix="medseg_task_"))
@@ -363,6 +375,10 @@ async def execute_task(
         async with AsyncSession(app_engine) as session:
             from sqlmodel import select
 
+            subset_result = await session.exec(
+                select(Subset).where(Subset.id == input_subset_id)
+            )
+            input_subset = subset_result.one()
             result = await session.exec(
                 select(Image).where(Image.subset_id == input_subset_id)
             )
@@ -404,6 +420,10 @@ async def execute_task(
             images=input_image_infos,
             params=params,
             sample_set_meta=sample_set_meta,
+            input_subset_id=input_subset.id,
+            input_subset_name=input_subset.name,
+            input_subset_type=input_subset.type,
+            input_subset_metadata=input_subset.metadata_ or {},
         )
         run_output = await mod.run(run_input)
 
@@ -439,7 +459,10 @@ async def execute_task(
                 await session.flush()
             except Exception as flush_exc:
                 # Check for unique constraint violation (subset name conflict)
-                if "UNIQUE constraint failed" in str(flush_exc) or "IntegrityError" in type(flush_exc).__name__:
+                if (
+                    "UNIQUE constraint failed" in str(flush_exc)
+                    or "IntegrityError" in type(flush_exc).__name__
+                ):
                     raise RuntimeError(
                         f"Output subset name '{output_subset_name}' already exists. "
                         "Use overwrite=true or choose a different name."
@@ -484,7 +507,13 @@ async def execute_task(
             await session.commit()
 
         logger.info("Task %s completed successfully", task_id)
-        await _notify_task_status(user_id, task_id, "completed", module_name=module_name, sample_set_id=sample_set_id)
+        await _notify_task_status(
+            user_id,
+            task_id,
+            "completed",
+            module_name=module_name,
+            sample_set_id=sample_set_id,
+        )
 
     except Exception as exc:
         logger.exception("Task %s failed: %s", task_id, exc)
@@ -519,14 +548,26 @@ async def execute_task(
                     task_id,
                     task.retry_count,
                 )
-                await _notify_task_status(user_id, task_id, "queued", module_name=module_name, sample_set_id=sample_set_id)
+                await _notify_task_status(
+                    user_id,
+                    task_id,
+                    "queued",
+                    module_name=module_name,
+                    sample_set_id=sample_set_id,
+                )
             else:
                 task.status = TaskStatus.failed
                 task.error_message = str(exc)
                 task.completed_at = datetime.now(UTC)
                 session.add(task)
                 await session.commit()
-                await _notify_task_status(user_id, task_id, "failed", module_name=module_name, sample_set_id=sample_set_id)
+                await _notify_task_status(
+                    user_id,
+                    task_id,
+                    "failed",
+                    module_name=module_name,
+                    sample_set_id=sample_set_id,
+                )
 
     finally:
         # Cleanup temp directory

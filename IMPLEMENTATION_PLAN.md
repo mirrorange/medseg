@@ -8,13 +8,13 @@
 **Goal**: Add a pluggable BraTS normalization module skeleton with availability awareness and deterministic input metadata hashing.
 **Success Criteria**: Raw subsets are available, raw subsets without a matching normalized metadata hash are recommended, and normalized outputs carry `normalization_method=brats` plus the input metadata hash.
 **Tests**: Add/extend unit tests for `check_availability()`, metadata hashing behavior, and module info.
-**Status**: In Progress
+**Status**: Complete
 
 ## Stage 3: BraTS Normalization Execution
 **Goal**: Implement DICOM to NIfTI staging and BrainLes-based BraTS normalization output generation.
 **Success Criteria**: NIfTI inputs bypass conversion, DICOM inputs are converted before preprocessing, normalized outputs are written to `output_dir`, and runtime dependency errors are descriptive.
 **Tests**: Add unit tests around conversion branching, BrainLes orchestration, and `run()` metadata/output mapping.
-**Status**: Not Started
+**Status**: In Progress
 
 ## Stage 4: Verification And Integration
 **Goal**: Finalize test coverage, register the module cleanly, and validate repo quality gates.
