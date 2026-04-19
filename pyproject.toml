@@ -25,6 +25,12 @@ dependencies = [
 normalizer = [
     "brainles-preprocessing",
 ]
+segmenter = [
+    "imfuse-infer",
+]
+segmenter-cuda = [
+    "imfuse-infer[cuda]",
+]
 
 [dependency-groups]
 dev = [
