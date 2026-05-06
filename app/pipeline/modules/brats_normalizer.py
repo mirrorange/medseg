@@ -68,7 +68,7 @@ class BratsNormalizationParams(BaseModel):
     )
     t1c_image: str | None = Field(
         default=None,
-        description="Filename or image UUID to use ƒas BraTS T1c.",
+        description="Filename or image UUID to use as BraTS T1c.",
     )
     t2f_image: str | None = Field(
         default=None,
