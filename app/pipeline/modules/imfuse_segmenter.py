@@ -2,7 +2,14 @@
 
 import asyncio
 import logging
+import os
+import shutil
+import tempfile
+import urllib.request
 import uuid
+import zipfile
+from pathlib import Path
+from threading import Lock
 from typing import Any
 
 from app.pipeline.interface import (
@@ -23,6 +30,11 @@ logger = logging.getLogger(__name__)
 METADATA_HASH_FIELD = "input_subset_metadata_hash"
 SEGMENTATION_METHOD_FIELD = "segmentation_method"
 SEGMENTATION_METHOD_VALUE = "imfuse"
+IMFUSE_CHECKPOINT_URL = "https://ditto.ing.unimore.it/IM-FUSE/download/checkpoints"
+IMFUSE_CHECKPOINT_FILENAME = "model_last.pth"
+IMFUSE_CHECKPOINT_ROOT_ENV = "MEDSEG_IMFUSE_CHECKPOINT_DIR"
+_DOWNLOAD_CHUNK_SIZE = 1024 * 1024
+_DOWNLOAD_TIMEOUT_SECONDS = 30
 
 # BraTS modality name → imfuse-infer modality name
 _BRATS_TO_IMFUSE: dict[str, str] = {
@@ -35,6 +47,8 @@ _BRATS_TO_IMFUSE: dict[str, str] = {
 
 class IMFuseSegmenterModule(PipelineModule):
     """IM-Fuse brain tumor segmentation via sliding-window Mamba fusion."""
+
+    _checkpoint_lock = Lock()
 
     def __init__(self) -> None:
         self._predictor: Any = None
@@ -105,6 +119,8 @@ class IMFuseSegmenterModule(PipelineModule):
     async def load(self) -> None:
         from imfuse_infer import IMFusePredictor
 
+        checkpoint_path = await asyncio.to_thread(self._ensure_checkpoint)
+
         self._use_gpu = self._detect_gpu()
         if self._use_gpu and self._detect_mamba_ssm():
             self._mamba_backend = "mamba_ssm"
@@ -117,7 +133,7 @@ class IMFuseSegmenterModule(PipelineModule):
             device = "cpu"
 
         self._predictor = IMFusePredictor(
-            checkpoint="",  # placeholder — set per-run via _run_inference
+            checkpoint=str(checkpoint_path),
             device=device,
             mamba_backend=self._mamba_backend,
         )
@@ -192,6 +208,111 @@ class IMFuseSegmenterModule(PipelineModule):
         )
 
     # ---- Private helpers ----
+
+    def _ensure_checkpoint(self) -> Path:
+        checkpoint_path = self._checkpoint_path()
+        if checkpoint_path.is_file():
+            return checkpoint_path
+
+        with self._checkpoint_lock:
+            if checkpoint_path.is_file():
+                return checkpoint_path
+
+            checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+            logger.info("Downloading IM-Fuse checkpoint to %s", checkpoint_path)
+
+            try:
+                with tempfile.TemporaryDirectory(
+                    prefix="imfuse-checkpoint-",
+                    dir=checkpoint_path.parent,
+                ) as tmp_dir:
+                    archive_path = Path(tmp_dir) / "checkpoints.zip"
+                    self._download_checkpoint_archive(archive_path)
+                    self._extract_checkpoint(archive_path, checkpoint_path)
+            except RuntimeError:
+                raise
+            except Exception as exc:
+                raise RuntimeError(
+                    "Failed to prepare IM-Fuse checkpoint. "
+                    f"Download it manually from {IMFUSE_CHECKPOINT_URL} and place "
+                    f"{IMFUSE_CHECKPOINT_FILENAME} in {checkpoint_path.parent}."
+                ) from exc
+
+        return checkpoint_path
+
+    def _checkpoint_path(self) -> Path:
+        configured_root = os.environ.get(IMFUSE_CHECKPOINT_ROOT_ENV)
+        if configured_root:
+            checkpoint_root = Path(configured_root).expanduser()
+        else:
+            xdg_cache_home = os.environ.get("XDG_CACHE_HOME")
+            cache_root = (
+                Path(xdg_cache_home).expanduser()
+                if xdg_cache_home
+                else Path.home() / ".cache"
+            )
+            checkpoint_root = cache_root / "medseg" / "imfuse"
+
+        return checkpoint_root / IMFUSE_CHECKPOINT_FILENAME
+
+    def _download_checkpoint_archive(self, archive_path: Path) -> None:
+        request = urllib.request.Request(
+            IMFUSE_CHECKPOINT_URL,
+            headers={"User-Agent": "MedSeg IM-Fuse checkpoint downloader"},
+        )
+        with (
+            urllib.request.urlopen(
+                request,
+                timeout=_DOWNLOAD_TIMEOUT_SECONDS,
+            ) as response,
+            archive_path.open("wb") as output_file,
+        ):
+            shutil.copyfileobj(response, output_file, length=_DOWNLOAD_CHUNK_SIZE)
+
+        if archive_path.stat().st_size == 0:
+            raise RuntimeError("Downloaded IM-Fuse checkpoint archive is empty.")
+
+    def _extract_checkpoint(self, archive_path: Path, checkpoint_path: Path) -> None:
+        temp_checkpoint_path: Path | None = None
+        try:
+            with zipfile.ZipFile(archive_path) as archive:
+                checkpoint_member = self._find_checkpoint_member(archive)
+                if checkpoint_member is None:
+                    raise RuntimeError(
+                        "Downloaded IM-Fuse archive does not contain "
+                        f"{IMFUSE_CHECKPOINT_FILENAME}."
+                    )
+
+                with tempfile.NamedTemporaryFile(
+                    prefix=f".{IMFUSE_CHECKPOINT_FILENAME}.",
+                    suffix=".tmp",
+                    dir=checkpoint_path.parent,
+                    delete=False,
+                ) as temp_checkpoint:
+                    temp_checkpoint_path = Path(temp_checkpoint.name)
+                    with archive.open(checkpoint_member) as source:
+                        shutil.copyfileobj(
+                            source,
+                            temp_checkpoint,
+                            length=_DOWNLOAD_CHUNK_SIZE,
+                        )
+
+            if temp_checkpoint_path is None:
+                raise RuntimeError("Failed to extract IM-Fuse checkpoint.")
+            os.replace(temp_checkpoint_path, checkpoint_path)
+            logger.info("IM-Fuse checkpoint ready at %s", checkpoint_path)
+        finally:
+            if temp_checkpoint_path is not None and temp_checkpoint_path.exists():
+                temp_checkpoint_path.unlink()
+
+    def _find_checkpoint_member(self, archive: zipfile.ZipFile) -> str | None:
+        for member in archive.infolist():
+            if (
+                not member.is_dir()
+                and Path(member.filename).name == IMFUSE_CHECKPOINT_FILENAME
+            ):
+                return member.filename
+        return None
 
     def _run_inference(self, input_paths: dict[str, str], output_path: str) -> None:
         if self._predictor is None:
