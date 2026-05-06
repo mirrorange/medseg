@@ -19,7 +19,7 @@ from app.pipeline.resource_manager import InsufficientResources, ResourceManager
 def test_echo_module_info():
     mod = EchoModule()
     info = mod.module_info()
-    assert info.name == "echo"
+    assert info.name == "Echo"
     assert info.version == "0.1.0"
     assert info.max_ram_mb == 10
 
@@ -130,28 +130,28 @@ def test_registry_register_and_list():
     modules = reg.list_all()
     assert len(modules) == 1
     info, enabled = modules[0]
-    assert info.name == "echo"
+    assert info.name == "Echo"
     assert enabled is True
 
 
 def test_registry_enable_disable():
     reg = ModuleRegistry()
     reg.register(EchoModule())
-    assert reg.is_enabled("echo")
-    reg.disable("echo")
-    assert not reg.is_enabled("echo")
+    assert reg.is_enabled("Echo")
+    reg.disable("Echo")
+    assert not reg.is_enabled("Echo")
     assert len(reg.list_enabled()) == 0
-    reg.enable("echo")
-    assert reg.is_enabled("echo")
+    reg.enable("Echo")
+    assert reg.is_enabled("Echo")
     assert len(reg.list_enabled()) == 1
 
 
 def test_registry_get():
     reg = ModuleRegistry()
     reg.register(EchoModule())
-    mod = reg.get("echo")
+    mod = reg.get("Echo")
     assert mod is not None
-    assert mod.module_info().name == "echo"
+    assert mod.module_info().name == "Echo"
     assert reg.get("nonexistent") is None
 
 
@@ -207,11 +207,11 @@ async def test_resource_manager_load_unload():
     rm = ResourceManager(total_ram_mb=1000, total_vram_mb=8000, threshold_ratio=0.8)
     mod = EchoModule()
     await rm.load_module(mod)
-    assert rm.is_loaded("echo")
+    assert rm.is_loaded("Echo")
     assert rm.used_ram_mb == 10
 
-    await rm.unload_module("echo")
-    assert not rm.is_loaded("echo")
+    await rm.unload_module("Echo")
+    assert not rm.is_loaded("Echo")
     assert rm.used_ram_mb == 0
 
 
@@ -235,12 +235,12 @@ async def test_resource_manager_eviction():
     big = BigModule()  # 700 MB
 
     await rm.load_module(echo)
-    assert rm.is_loaded("echo")
+    assert rm.is_loaded("Echo")
 
     # Load big — echo (10 MB) + big (700 MB) = 710 < 800, should fit
     await rm.load_module(big)
     assert rm.is_loaded("big")
-    assert rm.is_loaded("echo")
+    assert rm.is_loaded("Echo")
 
 
 @pytest.mark.asyncio

@@ -21,7 +21,7 @@ def test_brats_normalizer_module_info():
     mod._gpu_available = lambda: True
     info = mod.module_info()
 
-    assert info.name == "brats_normalizer"
+    assert info.name == "BraTS Normalizer"
     assert info.version == "0.1.0"
     assert info.max_vram_mb == 4096
     assert info.params_schema is not None

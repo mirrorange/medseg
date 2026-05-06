@@ -152,7 +152,7 @@ def _register_echo_module():
     mod = EchoModule()
     registry.register(mod)
     yield
-    registry.unregister("echo")
+    registry.unregister("Echo")
     # Clean up scheduler queues
     scheduler._queues.clear()
     scheduler._entries.clear()
@@ -214,7 +214,7 @@ async def test_submit_task(client, auth_header, sample_set_with_subset):
     resp = await client.post(
         "/api/pipelines/run",
         json={
-            "module_name": "echo",
+            "module_name": "Echo",
             "sample_set_id": data["sample_set_id"],
             "input_subset_id": data["subset_id"],
             "output_subset_name": "echo_output",
@@ -224,7 +224,7 @@ async def test_submit_task(client, auth_header, sample_set_with_subset):
     assert resp.status_code == 201
     task = resp.json()
     assert task["status"] == "queued"
-    assert task["module_name"] == "echo"
+    assert task["module_name"] == "Echo"
 
 
 @pytest.mark.asyncio
@@ -235,7 +235,7 @@ async def test_list_my_tasks(client, auth_header, sample_set_with_subset):
     await client.post(
         "/api/pipelines/run",
         json={
-            "module_name": "echo",
+            "module_name": "Echo",
             "sample_set_id": data["sample_set_id"],
             "input_subset_id": data["subset_id"],
             "output_subset_name": "echo_output",
@@ -256,7 +256,7 @@ async def test_get_task_detail(client, auth_header, sample_set_with_subset):
     resp = await client.post(
         "/api/pipelines/run",
         json={
-            "module_name": "echo",
+            "module_name": "Echo",
             "sample_set_id": data["sample_set_id"],
             "input_subset_id": data["subset_id"],
             "output_subset_name": "echo_output",
@@ -277,7 +277,7 @@ async def test_cancel_task(client, auth_header, sample_set_with_subset):
     resp = await client.post(
         "/api/pipelines/run",
         json={
-            "module_name": "echo",
+            "module_name": "Echo",
             "sample_set_id": data["sample_set_id"],
             "input_subset_id": data["subset_id"],
             "output_subset_name": "echo_cancel",
@@ -299,7 +299,7 @@ async def test_delete_finished_task(client, auth_header, sample_set_with_subset)
     resp = await client.post(
         "/api/pipelines/run",
         json={
-            "module_name": "echo",
+            "module_name": "Echo",
             "sample_set_id": data["sample_set_id"],
             "input_subset_id": data["subset_id"],
             "output_subset_name": "echo_delete",
@@ -327,7 +327,7 @@ async def test_clear_task_history(client, auth_header, sample_set_with_subset):
         resp = await client.post(
             "/api/pipelines/run",
             json={
-                "module_name": "echo",
+                "module_name": "Echo",
                 "sample_set_id": data["sample_set_id"],
                 "input_subset_id": data["subset_id"],
                 "output_subset_name": name,
@@ -419,7 +419,7 @@ async def test_batch_run_pipeline(client, auth_header, sample_set_with_two_subse
     resp = await client.post(
         "/api/pipelines/batch-run",
         json={
-            "module_name": "echo",
+            "module_name": "Echo",
             "sample_set_id": data["sample_set_id"],
             "input_subset_ids": data["subset_ids"],
             "output_subset_name_template": "{input_name}_echo",
@@ -443,7 +443,7 @@ async def test_batch_run_empty_list(client, auth_header, sample_set_with_two_sub
     resp = await client.post(
         "/api/pipelines/batch-run",
         json={
-            "module_name": "echo",
+            "module_name": "Echo",
             "sample_set_id": data["sample_set_id"],
             "input_subset_ids": [],
         },
@@ -465,7 +465,7 @@ async def test_batch_run_with_invalid_subset(
     resp = await client.post(
         "/api/pipelines/batch-run",
         json={
-            "module_name": "echo",
+            "module_name": "Echo",
             "sample_set_id": data["sample_set_id"],
             "input_subset_ids": [data["subset_ids"][0], fake_id],
             "output_subset_name_template": "{input_name}_echo",
@@ -486,7 +486,7 @@ async def test_submit_task_with_overwrite(client, auth_header, sample_set_with_s
     resp = await client.post(
         "/api/pipelines/run",
         json={
-            "module_name": "echo",
+            "module_name": "Echo",
             "sample_set_id": data["sample_set_id"],
             "input_subset_id": data["subset_id"],
             "output_subset_name": "echo_output",
@@ -508,7 +508,7 @@ async def test_submit_task_overwrite_defaults_false(
     resp = await client.post(
         "/api/pipelines/run",
         json={
-            "module_name": "echo",
+            "module_name": "Echo",
             "sample_set_id": data["sample_set_id"],
             "input_subset_id": data["subset_id"],
             "output_subset_name": "echo_output",
@@ -530,7 +530,7 @@ async def test_submit_task_rejects_pending_name_conflict(
     resp1 = await client.post(
         "/api/pipelines/run",
         json={
-            "module_name": "echo",
+            "module_name": "Echo",
             "sample_set_id": data["sample_set_id"],
             "input_subset_id": data["subset_id"],
             "output_subset_name": "same_name",
@@ -544,7 +544,7 @@ async def test_submit_task_rejects_pending_name_conflict(
     resp2 = await client.post(
         "/api/pipelines/run",
         json={
-            "module_name": "echo",
+            "module_name": "Echo",
             "sample_set_id": data["sample_set_id"],
             "input_subset_id": data["subset_id"],
             "output_subset_name": "same_name",
@@ -565,7 +565,7 @@ async def test_submit_task_allows_overwrite_with_pending(
     resp1 = await client.post(
         "/api/pipelines/run",
         json={
-            "module_name": "echo",
+            "module_name": "Echo",
             "sample_set_id": data["sample_set_id"],
             "input_subset_id": data["subset_id"],
             "output_subset_name": "overwrite_name",
@@ -579,7 +579,7 @@ async def test_submit_task_allows_overwrite_with_pending(
     resp2 = await client.post(
         "/api/pipelines/run",
         json={
-            "module_name": "echo",
+            "module_name": "Echo",
             "sample_set_id": data["sample_set_id"],
             "input_subset_id": data["subset_id"],
             "output_subset_name": "overwrite_name",
