@@ -224,6 +224,8 @@ __marimo__/
 
 # Application data
 *.db
-storage/
+/storage/
 logs/
 .DS_Store
+
+.github/skills
