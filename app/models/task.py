@@ -7,6 +7,8 @@ from sqlalchemy import Column
 from sqlalchemy.types import JSON
 from sqlmodel import Field, SQLModel
 
+from app.db.types import UTCDateTime
+
 
 class TaskStatus(StrEnum):
     queued = "queued"
@@ -31,6 +33,15 @@ class Task(SQLModel, table=True):
     status: TaskStatus = Field(default=TaskStatus.queued)
     error_message: str | None = None
     retry_count: int = Field(default=0)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    started_at: datetime | None = None
-    completed_at: datetime | None = None
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(UTCDateTime(), nullable=False),
+    )
+    started_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(UTCDateTime(), nullable=True),
+    )
+    completed_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(UTCDateTime(), nullable=True),
+    )

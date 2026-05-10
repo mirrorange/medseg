@@ -5,6 +5,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from app.models.task import TaskStatus
+from app.schemas.base import UTCModel
 
 
 class TaskCreate(BaseModel):
@@ -16,7 +17,7 @@ class TaskCreate(BaseModel):
     overwrite: bool = False
 
 
-class TaskRead(BaseModel):
+class TaskRead(UTCModel):
     id: uuid.UUID
     user_id: uuid.UUID
     module_name: str

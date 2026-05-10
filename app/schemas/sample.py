@@ -4,6 +4,8 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from app.schemas.base import UTCModel
+
 # --- SampleSet ---
 
 
@@ -19,7 +21,7 @@ class SampleSetUpdate(BaseModel):
     folder_id: uuid.UUID | None = None
 
 
-class SampleSetRead(BaseModel):
+class SampleSetRead(UTCModel):
     id: uuid.UUID
     name: str
     description: str | None
@@ -42,7 +44,7 @@ class SampleSetDetail(SampleSetRead):
 # --- Subset ---
 
 
-class SubsetRead(BaseModel):
+class SubsetRead(UTCModel):
     id: uuid.UUID
     sample_set_id: uuid.UUID
     name: str
@@ -69,7 +71,7 @@ class ImageUpdate(BaseModel):
     filename: str | None = None
 
 
-class ImageRead(BaseModel):
+class ImageRead(UTCModel):
     id: uuid.UUID
     subset_id: uuid.UUID
     filename: str

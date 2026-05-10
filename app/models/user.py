@@ -2,7 +2,10 @@ import uuid
 from datetime import UTC, datetime
 from enum import StrEnum
 
+from sqlalchemy import Column
 from sqlmodel import Field, SQLModel
+
+from app.db.types import UTCDateTime
 
 
 class UserRole(StrEnum):
@@ -17,5 +20,11 @@ class User(SQLModel, table=True):
     hashed_password: str
     role: UserRole = Field(default=UserRole.user)
     is_active: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(UTCDateTime(), nullable=False),
+    )
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(UTCDateTime(), nullable=False),
+    )

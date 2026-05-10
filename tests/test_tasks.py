@@ -4,6 +4,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from sqlmodel import select
 
 from app.pipeline.scheduler import Scheduler
 
@@ -225,6 +226,37 @@ async def test_submit_task(client, auth_header, sample_set_with_subset):
     task = resp.json()
     assert task["status"] == "queued"
     assert task["module_name"] == "Echo"
+
+
+@pytest.mark.asyncio
+async def test_task_timestamps_are_utc_in_db_and_api(
+    client, auth_header, sample_set_with_subset, session
+):
+    """Submitted task timestamps should round-trip as explicit UTC."""
+    from app.models.task import Task
+
+    data = sample_set_with_subset
+    resp = await client.post(
+        "/api/pipelines/run",
+        json={
+            "module_name": "Echo",
+            "sample_set_id": data["sample_set_id"],
+            "input_subset_id": data["subset_id"],
+            "output_subset_name": "echo_utc",
+        },
+        headers=auth_header,
+    )
+    assert resp.status_code == 201
+
+    payload = resp.json()
+    assert payload["created_at"].endswith("Z")
+    assert datetime.fromisoformat(
+        payload["created_at"].replace("Z", "+00:00")
+    ).tzinfo == UTC
+
+    result = await session.exec(select(Task).where(Task.id == uuid.UUID(payload["id"])))
+    db_task = result.one()
+    assert db_task.created_at.tzinfo == UTC
 
 
 @pytest.mark.asyncio
@@ -524,7 +556,7 @@ async def test_submit_task_overwrite_defaults_false(
 async def test_submit_task_rejects_pending_name_conflict(
     client, auth_header, sample_set_with_subset
 ):
-    """When a queued task already targets the same output name, a second non-overwrite task should be rejected."""
+    """Reject a second non-overwrite task targeting the same queued output."""
     data = sample_set_with_subset
     # First task succeeds
     resp1 = await client.post(
@@ -559,7 +591,7 @@ async def test_submit_task_rejects_pending_name_conflict(
 async def test_submit_task_allows_overwrite_with_pending(
     client, auth_header, sample_set_with_subset
 ):
-    """When overwrite=True, task should be accepted even if pending task has same name."""
+    """Accept overwrite tasks when a pending task has the same output name."""
     data = sample_set_with_subset
     # First task (no overwrite)
     resp1 = await client.post(

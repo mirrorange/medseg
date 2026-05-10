@@ -6,6 +6,8 @@ from sqlalchemy import Column, UniqueConstraint
 from sqlalchemy.types import JSON
 from sqlmodel import Field, Relationship, SQLModel
 
+from app.db.types import UTCDateTime
+
 if TYPE_CHECKING:
     from app.models.image import Image
     from app.models.sample_set import SampleSet
@@ -28,7 +30,10 @@ class Subset(SQLModel, table=True):
     source_params: dict[str, Any] | None = Field(
         default=None, sa_column=Column("source_params", JSON)
     )
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(UTCDateTime(), nullable=False),
+    )
 
     sample_set: Optional["SampleSet"] = Relationship(back_populates="subsets")
     images: list["Image"] = Relationship(

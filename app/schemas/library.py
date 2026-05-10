@@ -4,6 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from app.schemas.base import UTCModel
+
 # --- Folder ---
 
 
@@ -17,7 +19,7 @@ class FolderUpdate(BaseModel):
     parent_id: uuid.UUID | None = None
 
 
-class FolderRead(BaseModel):
+class FolderRead(UTCModel):
     id: uuid.UUID
     name: str
     owner_id: uuid.UUID
@@ -34,7 +36,7 @@ class FolderTreeNode(BaseModel):
     sample_sets: list["TreeSampleSet"] = []
 
 
-class TreeSampleSet(BaseModel):
+class TreeSampleSet(UTCModel):
     id: uuid.UUID
     name: str
     description: str | None
@@ -50,7 +52,7 @@ class BreadcrumbItem(BaseModel):
     name: str
 
 
-class LibraryItem(BaseModel):
+class LibraryItem(UTCModel):
     """A unified item in folder contents (folder or sample_set)."""
     id: uuid.UUID
     name: str
@@ -88,7 +90,7 @@ class BatchMoveRequest(BaseModel):
 # --- Share ---
 
 
-class SharedSampleSetRead(BaseModel):
+class SharedSampleSetRead(UTCModel):
     id: uuid.UUID
     sample_set_id: uuid.UUID
     sample_set_name: str
